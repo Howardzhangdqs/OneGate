@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Throughput Monitor</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d1117;
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.hidden {
+      display: none
+    }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 400px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group {
+      margin-bottom: 16px
+    }
+
+    .login-box .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .login-box .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      border-radius: 6px;
+      font-family: monospace
+    }
+
+    .login-box .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input {
+      accent-color: #238636
+    }
+
+    .main-content {
+      display: none
+    }
+
+    .main-content.active {
+      display: block
+    }
+
+    .container {
+      max-width: 1200px
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      color: #8b949e;
+      padding: 8px 0;
+      flex-wrap: wrap
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px
+    }
+
+    .status-dot.connected {
+      background: #3fb950;
+      box-shadow: 0 0 6px #3fb95080
+    }
+
+    .status-dot.disconnected {
+      background: #f85149
+    }
+
+    .status-dot.connecting {
+      background: #d29922;
+      animation: pulse-dot 1s infinite
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1 }
+      50% { opacity: .3 }
+    }
+
+    @keyframes pulse-row {
+      0%, 100% { background: transparent }
+      50% { background: #1c212820 }
+    }
+
+    .row-active td {
+      background: #0d1117;
+      animation: pulse-row 1.5s infinite
+    }
+
+    .row-active .indicator {
+      color: #3fb950;
+      font-weight: bold;
+      animation: pulse-dot 1s infinite
+    }
+
+    .row-done .indicator {
+      color: #3fb950
+    }
+
+    .row-error .indicator {
+      color: #f85149
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr))
+    }
+
+    .summary-item .value {
+      font-size: 22px
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%
+    }
+
+    th, td {
+      white-space: nowrap;
+      text-variant-numeric: tabular-nums
+    }
+
+    .col-time { width: 80px }
+    .col-model { min-width: 100px }
+    .col-provider { min-width: 70px }
+    .col-url { }
+    .col-num { min-width: 60px }
+    .col-status { width: 40px; text-align: center }
+
+    .mono {
+      font-family: monospace;
+      font-variant-numeric: tabular-nums
+    }
+
+    .btn-disconnect {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff
+    }
+
+    .btn-disconnect:hover {
+      background: #f85149
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #484f58
+    }
+
+    .error-msg {
+      color: #f85149;
+      font-size: 13px;
+      padding: 8px 0
+    }
+
+    .req-tooltip {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 14px;
+      max-width: 520px;
+      max-height: 80vh;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #c9d1d9;
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4)
+    }
+
+    .req-tooltip.visible {
+      display: block
+    }
+
+    .req-tooltip.pinned {
+      pointer-events: auto
+    }
+
+    .req-tooltip .tt-row {
+      margin-bottom: 4px
+    }
+
+    .req-tooltip .tt-label {
+      color: #8b949e;
+      font-size: 11px
+    }
+
+    .req-tooltip .tt-value {
+      font-family: monospace;
+      word-break: break-all
+    }
+
+    .req-tooltip .tt-preview {
+      background: #0d1117;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 2px;
+      max-height: 200px;
+      overflow-y: auto
+    }
+
+    .req-tooltip.pinned {
+      max-width: 800px;
+      max-height: 85vh;
+      pointer-events: auto
+    }
+
+    .detail-section {
+      border-top: 1px solid #30363d;
+      margin-top: 8px
+    }
+
+    .detail-section summary {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #58a6ff;
+      padding: 6px 0;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .detail-section summary::before {
+      content: '\25BC';
+      font-size: 10px
+    }
+
+    .detail-section:not([open]) summary::before {
+      content: '\25B6'
+    }
+
+    .detail-section summary:hover {
+      color: #79c0ff
+    }
+
+    .headers-grid {
+      background: #0d1117;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto
+    }
+
+    .headers-grid .hk {
+      color: #79c0ff
+    }
+
+    .headers-grid .hv {
+      color: #c9d1d9
+    }
+
+    .body-block {
+      background: #0d1117;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto
+    }
+
+    .truncated-notice {
+      font-size: 11px;
+      color: #d29922;
+      font-style: italic;
+      padding: 4px 0
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Throughput Monitor</h2>
+      <div class="form-group">
+        <label>Proxy Token</label>
+        <input type="text" id="login-token" placeholder="enter proxy token to monitor..." autofocus>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Monitor</button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+
+  <div class="main-content" id="main-content">
+    <div class="header">
+      <h1>Throughput Monitor</h1>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="info" id="status-info"></div>
+        <button class="btn btn-sm" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="status-bar">
+        <span><span class="status-dot connecting" id="status-dot"></span><span id="status-text">Connecting...</span></span>
+        <span>Requests: <strong id="req-count">0</strong></span>
+        <span>Active: <strong id="active-count">0</strong></span>
+      </div>
+
+      <div class="card">
+        <h3>Summary</h3>
+        <div class="summary-grid" id="summary-grid">
+          <div class="summary-item"><div class="value" id="sum-avg-in">-</div><div class="label">Avg Input Tokens</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-out">-</div><div class="label">Avg Output Tokens</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-tps">-</div><div class="label">Avg Output TPS</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-dur">-</div><div class="label">Avg Duration</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Live Requests</h3>
+          <button class="btn btn-sm" onclick="clearTable()">Clear</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:max-content;min-width:100%">
+            <thead>
+              <tr>
+                <th class="col-status"></th>
+                <th class="col-time">Time</th>
+                <th class="col-model">Model</th>
+                <th class="col-provider">Provider</th>
+                <th class="col-num">Input</th>
+                <th class="col-num">Output</th>
+                <th class="col-num">TTFT</th>
+                <th class="col-num">Duration</th>
+                <th class="col-num">TPS</th>
+                <th class="col-status">Code</th>
+                <th class="col-url">Request</th>
+                <th class="col-url">Target</th>
+              </tr>
+            </thead>
+            <tbody id="req-tbody"></tbody>
+          </table>
+        </div>
+        <div id="empty-state" class="empty-state">Waiting for requests...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="req-tooltip" id="req-tooltip"></div>
+  <script>
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const tbody = document.getElementById('req-tbody');
+    const emptyState = document.getElementById('empty-state');
+
+    let eventSource = null;
+    let sessionId = null;
+    let proxyToken = null;
+    let requests = {};
+    let totalFinished = 0;
+    let sumInTokens = 0;
+    let sumOutTokens = 0;
+    let sumTps = 0;
+    let sumDuration = 0;
+    const MAX_ROWS = 100;
+    let liveTimer = null;
+
+    function startLiveTimer() {
+      if (liveTimer) return;
+      liveTimer = setInterval(() => {
+        const now = Date.now();
+        for (const id in requests) {
+          const req = requests[id];
+          if (req.finished) continue;
+          const el = document.getElementById('row-' + id);
+          if (!el) continue;
+          const liveDur = now - req.time;
+          const durCell = el.children[7];
+          if (durCell) durCell.textContent = fmtDur(liveDur);
+          const ttftCell = el.children[6];
+          if (ttftCell && req.ttft_ms == null) {
+            ttftCell.textContent = fmtDur(liveDur);
+          }
+        }
+      }, 300);
+    }
+
+    function stopLiveTimer() {
+      if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    }
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      if (!token) {
+        document.getElementById('login-error').textContent = 'Please enter a token';
+        return;
+      }
+      document.getElementById('login-error').textContent = '';
+      proxyToken = token;
+
+      try {
+        const resp = await fetch('/throughput/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          document.getElementById('login-error').textContent = data.error || 'Failed';
+          proxyToken = null;
+          return;
+        }
+        sessionId = data.session_id;
+        localStorage.setItem('tp_token', document.getElementById('login-remember').checked ? token : '');
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('main-content').classList.add('active');
+        connectSSE();
+      } catch (e) {
+        document.getElementById('login-error').textContent = 'Network error';
+        proxyToken = null;
+      }
+    }
+
+    function doLogout() {
+      proxyToken = null;
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      sessionId = null;
+      localStorage.removeItem('tp_token');
+      document.getElementById('login-token').value = '';
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('main-content').classList.remove('active');
+      resetStats();
+    }
+
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    (function autoLogin() {
+      const saved = localStorage.getItem('tp_token');
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        doLogin();
+      }
+    })();
+
+    function connectSSE() {
+      eventSource = new EventSource('/throughput/events?sid=' + sessionId);
+
+      eventSource.addEventListener('connected', () => {
+        statusDot.className = 'status-dot connected';
+        statusText.textContent = 'Connected';
+        resetStats();
+        startLiveTimer();
+      });
+
+      eventSource.addEventListener('start', e => {
+        const d = JSON.parse(e.data);
+        requests[d.id] = { ...d, input_estimated: true, output_tokens: 0, ttft_ms: null, duration_ms: 0, tps: 0, status: null, lastUpdated: Date.now() };
+        addRow(d.id, requests[d.id]);
+        updateCounts();
+        emptyState.style.display = 'none';
+      });
+
+      eventSource.addEventListener('chunk', e => {
+        const d = JSON.parse(e.data);
+        const req = requests[d.id];
+        if (!req) return;
+        req.output_tokens = d.output_tokens;
+        req.duration_ms = d.duration_ms;
+        req.tps = d.tps;
+        if (d.ttft_ms != null) req.ttft_ms = d.ttft_ms;
+        req.lastUpdated = Date.now();
+        updateRow(d.id, req);
+        sortRows();
+      });
+
+      eventSource.addEventListener('end', e => {
+        const d = JSON.parse(e.data);
+        const req = requests[d.id];
+        if (!req) return;
+        req.input_tokens = d.input_tokens;
+        req.input_estimated = !!d.input_estimated;
+        req.output_tokens = d.output_tokens;
+        req.duration_ms = d.duration_ms;
+        req.ttft_ms = d.ttft_ms;
+        req.tps = d.tps;
+        req.status = d.status;
+        req.finished = true;
+        req.lastUpdated = Date.now();
+        if (d.response_body) req.response_body = d.response_body;
+        if (d.response_body_truncated) req.response_body_truncated = true;
+        if (d.response_headers) req.response_headers = d.response_headers;
+        totalFinished++;
+        sumInTokens += d.input_tokens || 0;
+        sumOutTokens += d.output_tokens || 0;
+        sumTps += d.tps || 0;
+        sumDuration += d.duration_ms || 0;
+        updateRow(d.id, req);
+        sortRows();
+        updateSummary();
+        updateCounts();
+      });
+
+      eventSource.onerror = () => {
+        statusDot.className = 'status-dot disconnected';
+        statusText.textContent = 'Disconnected';
+        stopLiveTimer();
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        sessionId = null;
+      };
+    }
+
+    function resetStats() {
+      requests = {};
+      totalFinished = 0;
+      sumInTokens = 0;
+      sumOutTokens = 0;
+      sumTps = 0;
+      sumDuration = 0;
+      tbody.innerHTML = '';
+      emptyState.style.display = '';
+      updateCounts();
+      document.getElementById('sum-avg-in').textContent = '-';
+      document.getElementById('sum-avg-out').textContent = '-';
+      document.getElementById('sum-avg-tps').textContent = '-';
+      document.getElementById('sum-avg-dur').textContent = '-';
+    }
+
+    function fmtTime(ts) {
+      const d = new Date(ts);
+      return d.toTimeString().slice(0, 8);
+    }
+
+    function fmtNum(n) {
+      if (n == null || n === 0) return '-';
+      return n.toLocaleString();
+    }
+
+    function fmtDur(ms) {
+      if (!ms) return '-';
+      if (ms < 1000) return ms + 'ms';
+      return (ms / 1000).toFixed(1) + 's';
+    }
+
+    function fmtTps(tps) {
+      if (!tps) return '-';
+      return tps.toFixed(1);
+    }
+
+    function fmtTTFT(ms, startTime, finished) {
+      if (ms != null) {
+        if (ms < 1000) return ms + 'ms';
+        return (ms / 1000).toFixed(1) + 's';
+      }
+      if (finished) return '-';
+      if (!startTime) return '-';
+      const live = Date.now() - startTime;
+      if (live < 1000) return live + 'ms';
+      return (live / 1000).toFixed(1) + 's';
+    }
+
+    function addRow(id, d) {
+      emptyState.style.display = 'none';
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + id;
+      tr.className = 'row-active';
+      tr.innerHTML = rowInner(d);
+      tr.addEventListener('mouseenter', e => { if (!pinnedId) showTooltip(e, id); });
+      tr.addEventListener('mousemove', e => { if (!pinnedId) positionTooltip(e); });
+      tr.addEventListener('mouseleave', () => { if (!pinnedId) hideTooltip(); });
+      tr.addEventListener('click', e => {
+        if (pinnedId === id) { pinnedId = null; hideTooltip(); }
+        else { pinnedId = id; showTooltip(e, id, true); }
+      });
+      if (tbody.firstChild) {
+        tbody.insertBefore(tr, tbody.firstChild);
+      } else {
+        tbody.appendChild(tr);
+      }
+      while (tbody.children.length > MAX_ROWS) {
+        const last = tbody.lastChild;
+        const rid = last.id.slice(4);
+        delete requests[rid];
+        tbody.removeChild(last);
+      }
+    }
+
+    function sortRows() {
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      if (rows.length < 2) return;
+      rows.sort((a, b) => {
+        const ra = requests[a.id.slice(4)];
+        const rb = requests[b.id.slice(4)];
+        if (!ra || !rb) return 0;
+        return (rb.lastUpdated || 0) - (ra.lastUpdated || 0);
+      });
+      for (const row of rows) {
+        tbody.appendChild(row);
+      }
+    }
+
+    function updateRow(id, d) {
+      const tr = document.getElementById('row-' + id);
+      if (!tr) return;
+      tr.innerHTML = rowInner(d);
+      tr.className = d.finished ? (d.status >= 400 ? 'row-error' : 'row-done') : 'row-active';
+      if (pinnedId === id) {
+        const fakeEvent = { clientX: parseInt(tooltip.style.left), clientY: parseInt(tooltip.style.top) };
+        showTooltip(fakeEvent, id, true);
+      }
+    }
+
+    function rowInner(d) {
+      const indicator = d.finished
+        ? (d.status >= 400 ? '<span class="indicator">\u2717</span>' : '<span class="indicator">\u2713</span>')
+        : '<span class="indicator">\u25cf</span>';
+      const status = d.status != null ? d.status : '-';
+      const reqUrl = esc(d.request_url || '-');
+      const tgtUrl = esc(d.target_url || '-');
+      return '<td class="col-status">' + indicator + '</td>'
+        + '<td class="col-time mono">' + fmtTime(d.time) + '</td>'
+        + '<td class="col-model mono">' + esc(d.model || '-') + '</td>'
+        + '<td class="col-provider">' + esc(d.provider || '-') + '</td>'
+        + '<td class="col-num mono">' + (d.input_estimated ? '~' : '') + fmtNum(d.input_tokens) + '</td>'
+        + '<td class="col-num mono">' + fmtNum(d.output_tokens) + '</td>'
+        + '<td class="col-num mono">' + fmtTTFT(d.ttft_ms, d.time, d.finished) + '</td>'
+        + '<td class="col-num mono">' + fmtDur(d.duration_ms) + '</td>'
+        + '<td class="col-num mono">' + fmtTps(d.tps) + '</td>'
+        + '<td class="col-status mono">' + status + '</td>'
+        + '<td class="col-url mono">' + reqUrl + '</td>'
+        + '<td class="col-url mono">' + tgtUrl + '</td>';
+    }
+
+    function updateCounts() {
+      document.getElementById('req-count').textContent = Object.keys(requests).length;
+      let active = 0;
+      for (const r of Object.values(requests)) {
+        if (!r.finished) active++;
+      }
+      document.getElementById('active-count').textContent = active;
+    }
+
+    function updateSummary() {
+      if (totalFinished === 0) return;
+      document.getElementById('sum-avg-in').textContent = Math.round(sumInTokens / totalFinished).toLocaleString();
+      document.getElementById('sum-avg-out').textContent = Math.round(sumOutTokens / totalFinished).toLocaleString();
+      document.getElementById('sum-avg-tps').textContent = (sumTps / totalFinished).toFixed(1);
+      document.getElementById('sum-avg-dur').textContent = (sumDuration / totalFinished / 1000).toFixed(1) + 's';
+    }
+
+    function clearTable() {
+      requests = {};
+      totalFinished = 0;
+      sumInTokens = 0;
+      sumOutTokens = 0;
+      sumTps = 0;
+      sumDuration = 0;
+      tbody.innerHTML = '';
+      emptyState.style.display = '';
+      updateCounts();
+      document.getElementById('sum-avg-in').textContent = '-';
+      document.getElementById('sum-avg-out').textContent = '-';
+      document.getElementById('sum-avg-tps').textContent = '-';
+      document.getElementById('sum-avg-dur').textContent = '-';
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    const tooltip = document.getElementById('req-tooltip');
+    let pinnedId = null;
+
+    function showTooltip(e, id, forceRefresh) {
+      const req = requests[id];
+      if (!req) return;
+      if (tooltip.classList.contains('visible') && tooltip.dataset.id === id && !forceRefresh) return;
+      const isPinned = pinnedId === id;
+      tooltip.innerHTML = isPinned ? buildDetailHtml(req) : buildCompactHtml(req);
+      tooltip.dataset.id = id;
+      tooltip.classList.add('visible');
+      if (isPinned) tooltip.classList.add('pinned');
+      else tooltip.classList.remove('pinned');
+      positionTooltip(e);
+    }
+
+    function buildCompactHtml(req) {
+      const row = (label, value) => '<div class="tt-row"><span class="tt-label">' + label + ':</span> <span class="tt-value">' + esc(String(value || '-')) + '</span></div>';
+      let html = '';
+      html += row('ID', req.id);
+      html += row('Model', req.model);
+      html += row('Provider', req.provider);
+      html += row('Status', req.status != null ? req.status : 'streaming...');
+      html += row('Input Tokens', (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens));
+      html += row('Output Tokens', fmtNum(req.output_tokens));
+      html += row('TPS', fmtTps(req.tps));
+      html += row('Duration', fmtDur(req.duration_ms));
+      html += row('TTFT', fmtTTFT(req.ttft_ms, req.time, req.finished));
+      html += row('Request URL', req.request_url);
+      html += row('Target URL', req.target_url);
+      return html;
+    }
+
+    function buildDetailHtml(req) {
+      const row = (label, value) => '<div class="tt-row"><span class="tt-label">' + label + ':</span> <span class="tt-value">' + esc(String(value || '-')) + '</span></div>';
+      let html = '<div style="font-size:14px;font-weight:600;color:#58a6ff;margin-bottom:8px">Request #' + esc(req.id || '') + '</div>';
+      html += row('Model', req.model);
+      html += row('Provider', req.provider);
+      html += row('Status', req.status != null ? req.status : 'streaming...');
+      html += row('Input Tokens', (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens));
+      html += row('Output Tokens', fmtNum(req.output_tokens));
+      html += row('TPS', fmtTps(req.tps));
+      html += row('Duration', fmtDur(req.duration_ms));
+      html += row('TTFT', fmtTTFT(req.ttft_ms, req.time, req.finished));
+      html += row('Request URL', req.request_url);
+      html += row('Target URL', req.target_url);
+      if (req.request_headers && Object.keys(req.request_headers).length) {
+        html += '<details class="detail-section" open><summary>Request Headers</summary>';
+        html += '<div class="headers-grid">';
+        for (const [k, v] of Object.entries(req.request_headers)) {
+          html += '<div><span class="hk">' + esc(k) + '</span>: <span class="hv">' + esc(v) + '</span></div>';
+        }
+        html += '</div></details>';
+      }
+      if (req.request_body) {
+        html += '<details class="detail-section" open><summary>Request Body</summary>';
+        if (req.request_body_truncated) html += '<div class="truncated-notice">Truncated at 100KB</div>';
+        html += '<div class="body-block">' + esc(prettyJson(req.request_body)) + '</div></details>';
+      }
+      if (req.response_headers && Object.keys(req.response_headers).length) {
+        html += '<details class="detail-section" open><summary>Response Headers</summary>';
+        html += '<div class="headers-grid">';
+        for (const [k, v] of Object.entries(req.response_headers)) {
+          html += '<div><span class="hk">' + esc(k) + '</span>: <span class="hv">' + esc(v) + '</span></div>';
+        }
+        html += '</div></details>';
+      }
+      if (req.response_body) {
+        html += '<details class="detail-section" open><summary>Response Body</summary>';
+        if (req.response_body_truncated) html += '<div class="truncated-notice">Truncated at 100KB</div>';
+        html += '<div class="body-block">' + esc(prettyJson(req.response_body)) + '</div></details>';
+      }
+      return html;
+    }
+
+    function prettyJson(str) {
+      try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
+    }
+
+    function positionTooltip(e) {
+      const pad = 12;
+      let x = e.clientX + pad;
+      let y = e.clientY + pad;
+      tooltip.style.left = '0px';
+      tooltip.style.top = '0px';
+      const rect = tooltip.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth - pad) x = e.clientX - rect.width - pad;
+      if (y + rect.height > window.innerHeight - pad) y = e.clientY - rect.height - pad;
+      if (x < pad) x = pad;
+      if (y < pad) y = pad;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('visible');
+      tooltip.classList.remove('pinned');
+    }
+
+    document.addEventListener('click', e => {
+      if (!pinnedId) return;
+      const row = document.getElementById('row-' + pinnedId);
+      if (row && row.contains(e.target)) return;
+      if (tooltip.contains(e.target)) return;
+      pinnedId = null;
+      hideTooltip();
+    });
+  </script>
+</body>
+
+</html>

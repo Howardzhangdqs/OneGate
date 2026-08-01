@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usage Query</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .container {
+      max-width: 960px
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 200px
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .form-group input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: monospace
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .form-group input[type="datetime-local"] {
+      font-family: inherit
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))
+    }
+
+    .summary-item .value {
+      font-size: 28px
+    }
+
+    .summary-item.current .value {
+      color: #3fb950
+    }
+
+    .bar-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .bar-cell span {
+      display: inline-block;
+      text-align: right;
+      font-variant-numeric: tabular-nums
+    }
+
+    .bar-track {
+      flex: 1;
+      min-width: 0
+    }
+
+    .bar {
+      height: 16px;
+      background: #238636;
+      border-radius: 3px;
+      min-width: 2px;
+      transition: width .3s
+    }
+
+    .stack {
+      display: flex;
+      height: 16px;
+      min-width: 2px;
+      border-radius: 3px;
+      overflow: hidden;
+      transition: width .3s
+    }
+
+    .seg {
+      height: 100%;
+      min-width: 0
+    }
+
+    .seg-in { background: #d29922 }
+    .seg-out { background: #58a6ff }
+    .seg-cr { background: #3fb950 }
+    .seg-cw { background: #f85149 }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 5px;
+      vertical-align: middle
+    }
+
+    .table-wrap {
+      overflow-x: auto
+    }
+
+    .table-wrap table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse
+    }
+
+    .table-wrap th,
+    .table-wrap td {
+      padding: 6px 12px;
+      white-space: nowrap;
+      text-align: right;
+      font-variant-numeric: tabular-nums
+    }
+
+    .table-wrap th:first-child,
+    .table-wrap td:first-child {
+      text-align: left
+    }
+
+    .table-wrap .h-hour { color: #8b949e; font-size: 12px }
+    .table-wrap tr.h-total td { border-top: 1px solid #30363d; font-weight: 600; color: #c9d1d9 }
+    .table-wrap .num-in { color: #d29922 }
+    .table-wrap .num-out { color: #58a6ff }
+    .table-wrap .num-cr { color: #3fb950 }
+    .table-wrap .num-cw { color: #f85149 }
+
+    .table-wrap tr.h-row { cursor: help }
+    .table-wrap tr.h-row:hover td { background: rgba(88,166,255,.06) }
+
+    .prov-tip {
+      position: fixed;
+      z-index: 500;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+      display: none;
+      min-width: 320px
+    }
+
+    .prov-tip.show { display: block }
+
+    .prov-tip table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    .prov-tip th,
+    .prov-tip td {
+      padding: 3px 8px 3px 0;
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums
+    }
+
+    .prov-tip th:first-child,
+    .prov-tip td:first-child { text-align: left }
+
+    .prov-tip th:last-child,
+    .prov-tip td:last-child { padding-right: 0 }
+
+    .prov-tip thead th {
+      color: #8b949e;
+      font-weight: 500;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 5px
+    }
+
+    .prov-tip .pt-prov { color: #58a6ff; font-weight: 600 }
+    .prov-tip .pt-in { color: #d29922 }
+    .prov-tip .pt-out { color: #58a6ff }
+    .prov-tip .pt-cr { color: #3fb950 }
+    .prov-tip .pt-cw { color: #f85149 }
+    .prov-tip tr.pt-total td {
+      border-top: 1px solid #30363d;
+      padding-top: 5px;
+      font-weight: 600
+    }
+
+    .token-info {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 16px
+    }
+
+    .token-info code {
+      color: #79c0ff;
+      background: #0d1117;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      word-break: break-all
+    }
+
+    .providers-tag {
+      display: inline-flex;
+      gap: 4px;
+      flex-wrap: wrap
+    }
+
+    #results {
+      display: none
+    }
+
+    .recent-tokens {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px
+    }
+
+    .recent-token-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      font-size: 11px;
+      color: #58a6ff;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      padding: 2px 4px 2px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: monospace;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: background .15s
+    }
+
+    .recent-token-tag:hover {
+      background: #1c2128;
+      border-color: #58a6ff
+    }
+
+    .recent-token-tag .tag-close {
+      flex-shrink: 0;
+      font-size: 14px;
+      line-height: 1;
+      color: #484f58;
+      cursor: pointer;
+      padding: 0 3px;
+      margin-left: 4px;
+      border-radius: 50%;
+      transition: color .15s, background .15s
+    }
+
+    .recent-token-tag .tag-close:hover {
+      color: #f85149;
+      background: rgba(248,81,73,.15)
+    }
+  </style>
+</head>
+
+<body>
+  <div class="prov-tip" id="prov-tip"></div>
+  <div class="header">
+    <h1>Usage Query</h1>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h3>Query Parameters</h3>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Token</label>
+          <input type="text" id="input-token" placeholder="enter your proxy token...">
+          <div class="recent-tokens" id="recent-tokens"></div>
+        </div>
+        <div class="form-group">
+          <label>Start (optional)</label>
+          <input type="datetime-local" id="input-start">
+        </div>
+        <div class="form-group">
+          <label>End (optional)</label>
+          <input type="datetime-local" id="input-end">
+        </div>
+        <button class="btn btn-primary" onclick="queryUsage()">Query</button>
+      </div>
+      <div id="error" class="error-msg" style="display:none"></div>
+    </div>
+
+    <div id="results">
+      <div class="card">
+        <h3>Token Info</h3>
+        <div class="token-info">
+          Token: <code id="res-token"></code> <span id="res-describe" style="font-size:12px;color:#8b949e"></span>
+          <br>Providers: <span class="providers-tag" id="res-providers"></span>
+        </div>
+        <div class="summary-grid" id="summary-grid"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Token Usage by Provider</h3>
+          <span style="font-size:12px;color:#8b949e">In selected range</span>
+        </div>
+        <div id="tokens-empty" class="loading">No token usage in selected range</div>
+        <div class="table-wrap">
+          <table id="tokens-table" style="display:none">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Req</th>
+                <th><span class="dot seg-in"></span>In</th>
+                <th><span class="dot seg-out"></span>Out</th>
+                <th><span class="dot seg-cr"></span>Cache R</th>
+                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>命中率</th>
+                <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
+              </tr>
+            </thead>
+            <tbody id="tokens-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <h3 style="margin:0">Hourly Token Usage</h3>
+            <span style="font-size:11px;color:#8b949e">(in + out + cache)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#8b949e;cursor:pointer;user-select:none" onclick="document.getElementById('chk-local').click()">
+            <input type="checkbox" id="chk-local" onchange="toggleTimezone()" style="accent-color:#58a6ff">Local Timezone
+            (<span id="tz-name"></span>)
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Hour</th>
+                <th>Req</th>
+                <th><span class="dot seg-in"></span>In</th>
+                <th><span class="dot seg-out"></span>Out</th>
+                <th><span class="dot seg-cr"></span>Cache R</th>
+                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>命中率</th>
+                <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
+              </tr>
+            </thead>
+            <tbody id="hourly-body"></tbody>
+          </table>
+        </div>
+        <div id="hourly-empty" class="loading" style="display:none">No data in selected range</div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading" style="display:none">Loading...</div>
+  </div>
+
+  <script>
+    const inputToken = document.getElementById('input-token');
+    const inputStart = document.getElementById('input-start');
+    const inputEnd = document.getElementById('input-end');
+
+    inputToken.addEventListener('keydown', e => { if (e.key === 'Enter') queryUsage(); });
+
+    // Auto-fill token from localStorage (set by admin page)
+    (function initFromStorage() {
+      const raw = localStorage.getItem('_usage_token');
+      if (raw) {
+        localStorage.removeItem('_usage_token');
+        try { var obj = JSON.parse(raw); inputToken.value = obj.t || raw; }
+        catch (e) { inputToken.value = raw; }
+        queryUsage();
+      }
+      renderRecentTokens();
+    })();
+
+    function saveRecentToken(token, desc) {
+      let list = JSON.parse(localStorage.getItem('_recent_tokens') || '[]');
+      list = list.filter(x => x.t !== token);
+      list.unshift({ t: token, d: desc || '' });
+      list = list.slice(0, 10);
+      localStorage.setItem('_recent_tokens', JSON.stringify(list));
+      renderRecentTokens();
+    }
+
+    function renderRecentTokens() {
+      const el = document.getElementById('recent-tokens');
+      const list = JSON.parse(localStorage.getItem('_recent_tokens') || '[]');
+      if (list.length === 0) { el.innerHTML = ''; return; }
+      el.innerHTML = list.map(item => {
+        const short = item.t.slice(0, 6) + '...';
+        const label = item.d ? `${short} ${item.d}` : short;
+        return `<span class="recent-token-tag" data-t="${esc(item.t)}" onclick="selectRecent(this)" title="${esc(item.t)}${item.d ? ' — ' + item.d : ''}">${esc(label)}<span onclick="event.stopPropagation();removeRecent('${esc(item.t)}')" class="tag-close">&times;</span></span>`;
+      }).join('');
+    }
+
+    function selectRecent(el) {
+      inputToken.value = el.dataset.t;
+      queryUsage();
+    }
+
+    function removeRecent(token) {
+      let list = JSON.parse(localStorage.getItem('_recent_tokens') || '[]');
+      list = list.filter(x => x.t !== token);
+      localStorage.setItem('_recent_tokens', JSON.stringify(list));
+      renderRecentTokens();
+    }
+
+    async function queryUsage() {
+      const token = inputToken.value.trim();
+      if (!token) {
+        showError('Please enter a token');
+        return;
+      }
+      hideError();
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      const body = { token };
+      if (inputStart.value) body.start = new Date(inputStart.value).toISOString();
+      if (inputEnd.value) body.end = new Date(inputEnd.value).toISOString();
+
+      try {
+        const resp = await fetch('/usage/api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        document.getElementById('loading').style.display = 'none';
+        if (!resp.ok) {
+          showError(data.error || 'Request failed');
+          return;
+        }
+        renderResults(data);
+        saveRecentToken(token, data.describe || '');
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        showError('Network error: ' + e.message);
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error').style.display = 'none';
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function escAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    let _lastData = null;
+
+    document.getElementById('tz-name').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    function toggleTimezone() {
+      if (_lastData) renderHourly(_lastData);
+    }
+
+    function fmtHour(utcStr) {
+      const useLocal = document.getElementById('chk-local').checked;
+      if (!useLocal) return esc(utcStr);
+      const d = new Date(utcStr);
+      const pad = n => String(n).padStart(2, '0');
+      return esc(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`);
+    }
+
+    function renderResults(data) {
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('res-token').textContent = data.token;
+      const descEl = document.getElementById('res-describe');
+      if (data.describe) {
+        descEl.textContent = '(' + data.describe + ')';
+        descEl.style.display = '';
+      } else {
+        descEl.style.display = 'none';
+      }
+
+      const provsEl = document.getElementById('res-providers');
+      if (data.providers.includes('*')) {
+        provsEl.innerHTML = '<span class="tag tag-all">* (all)</span>';
+      } else {
+        provsEl.innerHTML = data.providers.map(p => `<span class="tag">${esc(p)}</span>`).join('');
+      }
+
+      const summaryHtml = [
+        { label: 'Range Total', value: data.total, cls: '' },
+        { label: 'Last 24h', value: data.summary.last_24h, cls: 'current' },
+        { label: 'Last 7d', value: data.summary.last_7d, cls: '' },
+        { label: 'Last 30d', value: data.summary.last_30d, cls: '' },
+      ].map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
+      document.getElementById('summary-grid').innerHTML = summaryHtml;
+
+      const providerNames = Object.keys(data.current_hour.by_provider || {});
+      if (providerNames.length === 0 && data.total === 0) {
+        providerNames.push('default');
+      }
+
+      const allProvSet = new Set(providerNames);
+      Object.values(data.hourly).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
+      const allProv = [...allProvSet].sort();
+
+      _lastData = { hourly: data.hourly, allProv };
+      renderHourly({ hourly: data.hourly, allProv });
+      renderTokens(data.tokens || {});
+    }
+
+    function fmtNum(n) {
+      n = Number(n) || 0;
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+      return String(n);
+    }
+
+    function renderTokens(tokensByProvider) {
+      const tableEl = document.getElementById('tokens-table');
+      const emptyEl = document.getElementById('tokens-empty');
+      const tbody = document.getElementById('tokens-body');
+      const providers = Object.keys(tokensByProvider).filter(p =>
+        p !== '__total');
+      const hasData = providers.some(p => {
+        const t = tokensByProvider[p] || {};
+        return (t.input || t.output || t.cache_read || t.cache_write || t.requests);
+      });
+      if (!hasData) {
+        tableEl.style.display = 'none';
+        emptyEl.style.display = '';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      tableEl.style.display = '';
+      const maxVal = Math.max(...providers.map(p => {
+        const t = tokensByProvider[p] || {};
+        return (t.input || 0) + (t.output || 0) + (t.cache_read || 0) + (t.cache_write || 0);
+      }), 1);
+      const num = v => v ? fmtNum(v) : '-';
+      const cell = (v, cls) => `<td class="${cls || ''}">${num(v)}</td>`;
+      let totIn = 0, totOut = 0, totCR = 0, totCW = 0, totReq = 0;
+      const rows = providers.map(p => {
+        const t = tokensByProvider[p] || {};
+        totIn += t.input || 0; totOut += t.output || 0;
+        totCR += t.cache_read || 0; totCW += t.cache_write || 0;
+        totReq += t.requests || 0;
+        const d = { input: t.input || 0, output: t.output || 0, cache_read: t.cache_read || 0, cache_write: t.cache_write || 0 };
+        const stackW = Math.max(2, tokSum(d) / maxVal * 100).toFixed(1);
+        return `<tr><td class="pt-prov">${esc(p)}</td>${cell(t.requests || 0)}${cell(t.input, 'num-in')}${cell(t.output, 'num-out')}${cell(t.cache_read, 'num-cr')}${cell(t.cache_write, 'num-cw')}${hitRateCell(t.cache_read, t.input)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(d)}</div></td></tr>`;
+      });
+      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      tbody.innerHTML = rows.join('');
+    }
+
+    function tokSum(d) {
+      if (!d) return 0;
+      if (typeof d === 'number') return d;
+      return (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_write || 0);
+    }
+
+    function hitRate(cacheRead, input) {
+      const denom = (cacheRead || 0) + (input || 0);
+      if (!denom) return null;
+      return (cacheRead || 0) / denom;
+    }
+
+    function hitRateCell(cacheRead, input) {
+      const r = hitRate(cacheRead, input);
+      if (r == null) return '<td>-</td>';
+      const pct = (r * 100).toFixed(1);
+      const cls = r >= 0.95 ? 'num-cr' : (r >= 0.8 ? 'num-in' : 'num-cw');
+      return `<td class="${cls}">${pct}%</td>`;
+    }
+
+
+    function renderHourly({ hourly, allProv }) {
+      const tbody = document.getElementById('hourly-body');
+      const entries = Object.entries(hourly).reverse();
+
+      if (entries.length === 0) {
+        tbody.innerHTML = '';
+        document.getElementById('hourly-empty').style.display = 'block';
+        return;
+      }
+      document.getElementById('hourly-empty').style.display = 'none';
+
+      const dataRows = entries.map(([hour, counts]) => {
+        let dIn = 0, dOut = 0, dCR = 0, dCW = 0, dReq = 0;
+        const provDetails = allProv.map(p => {
+          const d = counts[p] || {};
+          dIn += d.input || 0; dOut += d.output || 0;
+          dCR += d.cache_read || 0; dCW += d.cache_write || 0;
+          dReq += d.requests || 0;
+          return { p, d };
+        });
+        return { hour, provDetails, dIn, dOut, dCR, dCW, dReq };
+      });
+
+      const maxVal = Math.max(...dataRows.map(r => r.dIn + r.dOut + r.dCR + r.dCW), 1);
+      const num = v => v ? fmtNum(v) : '-';
+      const cell = (v, cls) => `<td class="${cls || ''}">${num(v)}</td>`;
+
+      const html = [];
+      dataRows.forEach(r => {
+        const provs = r.provDetails.filter(pd => tokSum(pd.d) > 0 || (pd.d.requests || 0) > 0);
+        const tip = provs.length > 0 ? escAttr(provTipHtml(provs)) : '';
+        const stackW = Math.max(2, (r.dIn + r.dOut + r.dCR + r.dCW) / maxVal * 100).toFixed(1);
+        html.push(`<tr class="h-row" data-provs="${tip}"><td class="h-hour">${fmtHour(r.hour)}</td>${cell(r.dReq)}${cell(r.dIn, 'num-in')}${cell(r.dOut, 'num-out')}${cell(r.dCR, 'num-cr')}${cell(r.dCW, 'num-cw')}${hitRateCell(r.dCR, r.dIn)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs({ input: r.dIn, output: r.dOut, cache_read: r.dCR, cache_write: r.dCW })}</div></td></tr>`);
+      });
+      tbody.innerHTML = html.join('');
+    }
+
+    function ptHitRateCell(cr, inp) {
+      const r = hitRate(cr, inp);
+      if (r == null) return '<td>-</td>';
+      const pct = (r * 100).toFixed(1);
+      const cls = r >= 0.95 ? 'pt-cr' : (r >= 0.8 ? 'pt-in' : 'pt-cw');
+      return `<td class="${cls}">${pct}%</td>`;
+    }
+
+    function provTipHtml(provs) {
+      const head = '<thead><tr><th>Provider</th><th>Req</th><th>In</th><th>Out</th><th>Cache R</th><th>Cache W</th><th>命中率</th></tr></thead>';
+      let tIn = 0, tOut = 0, tCR = 0, tCW = 0, tReq = 0;
+      const rows = provs.map(({ p, d }) => {
+        tIn += d.input || 0; tOut += d.output || 0;
+        tCR += d.cache_read || 0; tCW += d.cache_write || 0;
+        tReq += d.requests || 0;
+        const c = (v, cls) => `<td class="${cls}">${fmtNum(v)}</td>`;
+        return `<tr><td class="pt-prov">${esc(p)}</td>${c(d.requests || 0)}${c(d.input || 0, 'pt-in')}${c(d.output || 0, 'pt-out')}${c(d.cache_read || 0, 'pt-cr')}${c(d.cache_write || 0, 'pt-cw')}${ptHitRateCell(d.cache_read, d.input)}</tr>`;
+      });
+      rows.push(`<tr class="pt-total"><td>Total</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
+      return '<table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
+    }
+
+    function stackSegs(d) {
+      const total = tokSum(d);
+      if (!total) return '';
+      return [
+        ['seg-in', d.input || 0],
+        ['seg-out', d.output || 0],
+        ['seg-cr', d.cache_read || 0],
+        ['seg-cw', d.cache_write || 0],
+      ].filter(([, v]) => v > 0).map(([cls, v]) => {
+        const w = (v / total * 100).toFixed(2);
+        return `<div class="seg ${cls}" style="width:${w}%"></div>`;
+      }).join('');
+    }
+
+    (function () {
+      const tip = document.getElementById('prov-tip');
+      const hb = document.getElementById('hourly-body');
+      function position(e) {
+        let x = e.clientX + 14, y = e.clientY + 14;
+        const r = tip.getBoundingClientRect();
+        if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - 14;
+        if (y + r.height > window.innerHeight - 8) y = e.clientY - r.height - 14;
+        tip.style.left = Math.max(8, x) + 'px';
+        tip.style.top = Math.max(8, y) + 'px';
+      }
+      hb.addEventListener('mouseover', function (e) {
+        const row = e.target.closest('tr.h-row[data-provs]');
+        if (!row || !row.dataset.provs) return;
+        tip.innerHTML = row.dataset.provs;
+        tip.classList.add('show');
+      });
+      hb.addEventListener('mousemove', function (e) {
+        if (tip.classList.contains('show')) position(e);
+      });
+      hb.addEventListener('mouseout', function (e) {
+        if (e.target.closest && e.target.closest('tr.h-row')) {
+          tip.classList.remove('show');
+        }
+      });
+    })();
+  </script>
+</body>
+
+</html>

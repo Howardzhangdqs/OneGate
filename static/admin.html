@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token Management</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #30363d;
+      border-radius: 8px
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: center;
+      white-space: nowrap
+    }
+
+    td {
+      padding: 8px 14px;
+      vertical-align: middle;
+      text-align: center
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px
+    }
+
+    .toolbar h2 {
+      font-size: 14px;
+      color: #8b949e
+    }
+
+    .token-cell {
+      text-align: left;
+      font-family: monospace;
+      font-size: 12px;
+      word-break: break-all;
+      color: #79c0ff;
+      cursor: pointer
+    }
+
+    .token-tip {
+      position: fixed;
+      z-index: 500;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      color: #79c0ff;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+      display: none
+    }
+
+    .token-tip.show {
+      display: block
+    }
+
+    .usage-tip {
+      position: fixed;
+      z-index: 500;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #c9d1d9;
+      font-size: 12px;
+      padding: 10px 12px;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+      display: none;
+      min-width: 280px
+    }
+
+    .usage-tip.show {
+      display: block
+    }
+
+    .usage-tip .ut-title {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .usage-tip table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent
+    }
+
+    .usage-tip th,
+    .usage-tip td {
+      padding: 3px 8px 3px 0;
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      background: transparent
+    }
+
+    .usage-tip th:first-child,
+    .usage-tip td:first-child {
+      text-align: left;
+      padding-left: 0
+    }
+
+    .usage-tip th:last-child,
+    .usage-tip td:last-child {
+      padding-right: 0
+    }
+
+    .usage-tip thead th {
+      color: #8b949e;
+      font-weight: 500;
+      font-size: 11px;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 5px;
+      background: transparent
+    }
+
+    .usage-tip .ut-prov {
+      color: #58a6ff;
+      font-weight: 600
+    }
+
+    .usage-tip tr.ut-total td {
+      border-top: 1px solid #30363d;
+      padding-top: 6px;
+      color: #c9d1d9;
+      font-weight: 600
+    }
+
+    .usage-tip tr.ut-total .ut-prov {
+      color: #3fb950
+    }
+
+    .usage-tip .ut-in { color: #d29922 }
+    .usage-tip .ut-out { color: #58a6ff }
+    .usage-tip .ut-cr { color: #3fb950 }
+    .usage-tip .ut-cw { color: #f85149 }
+    .usage-tip .ut-empty { color: #8b949e; font-style: italic; text-align: left }
+
+    .usage-tip .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: middle
+    }
+
+    .usage-tip .dot-in { background: #d29922 }
+    .usage-tip .dot-out { background: #58a6ff }
+    .usage-tip .dot-cr { background: #3fb950 }
+    .usage-tip .dot-cw { background: #f85149 }
+
+    .usage-cell {
+      cursor: help;
+      padding: 6px 14px
+    }
+
+    .usage-cell .uc-num {
+      font-size: 12px;
+      color: #c9d1d9;
+      line-height: 1.3
+    }
+
+    .mini-stack {
+      display: flex;
+      width: 52px;
+      height: 4px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: #21262d;
+      margin: 2px auto 0
+    }
+
+    .mini-stack .seg {
+      height: 100%;
+      min-width: 0
+    }
+
+    .mini-stack .seg-in { background: #d29922 }
+    .mini-stack .seg-out { background: #58a6ff }
+    .mini-stack .seg-cr { background: #3fb950 }
+    .mini-stack .seg-cw { background: #f85149 }
+
+    .providers-cell {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: center
+    }
+
+    .tag-admin {
+      border-color: #a371f7;
+      color: #a371f7
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600
+    }
+
+    .badge-admin {
+      background: #1f1035;
+      color: #a371f7;
+      border: 1px solid #a371f7
+    }
+
+    .badge-user {
+      background: #0d1117;
+      color: #8b949e;
+      border: 1px solid #30363d
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0
+    }
+
+    .toggle .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #30363d;
+      transition: .2s;
+      border-radius: 20px
+    }
+
+    .toggle .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #8b949e;
+      transition: .2s;
+      border-radius: 50%
+    }
+
+    .toggle input:checked+.slider {
+      background: #238636
+    }
+
+    .toggle input:checked+.slider:before {
+      transform: translateX(16px);
+      background: #fff
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 100;
+      justify-content: center;
+      align-items: center
+    }
+
+    .modal-overlay.active {
+      display: flex
+    }
+
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 300;
+      justify-content: center;
+      align-items: center
+    }
+
+    .confirm-overlay.active {
+      display: flex
+    }
+
+    .confirm-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      width: 360px;
+      max-width: 90vw
+    }
+
+    .confirm-box p {
+      font-size: 14px;
+      color: #c9d1d9;
+      margin-bottom: 20px;
+      word-break: break-all
+    }
+
+    .confirm-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end
+    }
+
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      width: 420px;
+      max-width: 90vw
+    }
+
+    .modal h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #c9d1d9
+    }
+
+    .form-group {
+      margin-bottom: 14px
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .form-group input[type=text] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: monospace
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px
+    }
+
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #c9d1d9;
+      cursor: pointer;
+      padding: 4px 10px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      transition: background .15s
+    }
+
+    .checkbox-group label:hover {
+      background: #1c2128
+    }
+
+    .checkbox-group input[type=checkbox] {
+      accent-color: #238636
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 20px
+    }
+
+    .copy-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      transition: background .15s
+    }
+
+    .copy-btn:hover {
+      color: #58a6ff;
+      background: #30363d
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: opacity .3s, transform .3s;
+      max-width: 400px;
+      word-break: break-word
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0)
+    }
+
+    .toast-error {
+      background: #da3633;
+      border: 1px solid #f85149
+    }
+
+    .toast-success {
+      background: #238636;
+      border: 1px solid #2ea043
+    }
+
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d1117;
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.hidden {
+      display: none
+    }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 400px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group {
+      margin-bottom: 16px
+    }
+
+    .login-box .form-group label {
+      margin-bottom: 8px
+    }
+
+    .login-box .form-group input {
+      padding: 10px 12px;
+      font-size: 14px
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input {
+      accent-color: #238636
+    }
+
+    .admin-content {
+      display: none
+    }
+
+    .admin-content.active {
+      display: block
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toast-container" id="toast-container"></div>
+  <div class="token-tip" id="token-tip"></div>
+  <div class="usage-tip" id="usage-tip"></div>
+
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <div class="form-group">
+        <label>Admin Token</label>
+        <input type="text" id="login-token" placeholder="enter admin token..." autofocus>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+
+  <div class="admin-content" id="admin-content">
+    <div class="header">
+      <h1>Token Management</h1>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="info" id="stats"></div>
+        <button class="btn btn-sm" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="toolbar">
+        <h2 id="token-count"></h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="loadTokens()">Refresh</button>
+          <button class="btn btn-primary" onclick="showCreateModal()">+ New Token</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Describe</th>
+            <th>Providers</th>
+            <th>Admin</th>
+            <th>Enabled</th>
+            <th>Rate Limits</th>
+            <th>1d</th>
+            <th>7d</th>
+            <th>30d</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="token-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <h3 id="modal-title">New Token</h3>
+        <div class="form-group">
+          <label>Token (leave empty to auto-generate)</label>
+          <input type="text" id="modal-token" placeholder="auto-generated">
+        </div>
+        <div class="form-group">
+          <label>Describe</label>
+          <input type="text" id="modal-describe" placeholder="describe the token usage..." style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,monospace">
+        </div>
+        <div class="form-group">
+          <label>Providers</label>
+          <div class="checkbox-group" id="modal-providers"></div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px">
+          <label style="margin:0;text-transform:none;font-size:13px;color:#c9d1d9">Admin</label>
+          <label class="toggle">
+            <input type="checkbox" id="modal-admin">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label>Rate Limits (-1 = unlimited, 0 = not allowed)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:6px">
+            <div>
+              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPM</label>
+              <input type="number" id="modal-rpm" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPH</label>
+              <input type="number" id="modal-rph" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPD</label>
+              <input type="number" id="modal-rpd" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPT</label>
+              <input type="number" id="modal-rpt" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="hideModal()">Cancel</button>
+          <button class="btn btn-primary" id="modal-submit" onclick="submitModal()">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-overlay" id="confirm-overlay">
+      <div class="confirm-box">
+        <p id="confirm-message"></p>
+        <div class="confirm-actions">
+          <button class="btn" onclick="confirmCancel()">Cancel</button>
+          <button class="btn btn-danger" id="confirm-ok" onclick="confirmOk()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROVIDERS = /*__PROVIDERS__*/;
+    const API_BASE = '';
+    let adminToken = null;
+    let editingToken = null;
+
+    function apiHeaders() {
+      return { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: apiHeaders() };
+      if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + path, opts);
+      const data = await resp.json();
+      return { ok: resp.ok, status: resp.status, data };
+    }
+
+    function toast(msg, type) {
+      type = type || 'error';
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + type;
+      el.textContent = msg;
+      document.getElementById('toast-container').appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function fmtDate(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts * 1000);
+      return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function escAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function copyToken(token) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(token).then(() => toast('Token copied', 'success')).catch(() => fallbackCopy(token));
+      } else {
+        fallbackCopy(token);
+      }
+    }
+
+    function fallbackCopy(token) {
+      const ta = document.createElement('textarea');
+      ta.value = token;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); toast('Token copied', 'success'); }
+      catch (e) { toast('Copy failed', 'error'); }
+      document.body.removeChild(ta);
+    }
+
+    (function () {
+      const tip = document.getElementById('token-tip');
+      const utip = document.getElementById('usage-tip');
+
+      function positionTip(el, e) {
+        let x = e.clientX + 14;
+        let y = e.clientY + 14;
+        const rect = el.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth - 8) x = e.clientX - rect.width - 14;
+        if (y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - 14;
+        if (x < 8) x = 8;
+        if (y < 8) y = 8;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+      }
+
+      document.addEventListener('mouseover', function (e) {
+        const cell = e.target.closest('.token-cell');
+        if (cell) {
+          tip.textContent = cell.dataset.full;
+          tip.classList.add('show');
+          return;
+        }
+        const ucell = e.target.closest('.usage-cell');
+        if (ucell) {
+          utip.innerHTML = ucell.dataset.tip || '';
+          utip.classList.add('show');
+        }
+      });
+      document.addEventListener('mousemove', function (e) {
+        if (tip.classList.contains('show')) positionTip(tip, e);
+        if (utip.classList.contains('show')) positionTip(utip, e);
+      });
+      document.addEventListener('mouseout', function (e) {
+        if (e.target.closest && e.target.closest('.token-cell')) {
+          tip.classList.remove('show');
+        }
+        if (e.target.closest && e.target.closest('.usage-cell')) {
+          utip.classList.remove('show');
+        }
+      });
+      document.addEventListener('click', function (e) {
+        const cell = e.target.closest('.token-cell');
+        if (cell && cell.dataset.full) {
+          copyToken(cell.dataset.full);
+          tip.classList.remove('show');
+        }
+      });
+    })();
+
+    function renderProviders(provs) {
+      if (provs.includes('*')) return '<span class="tag tag-all">* (all)</span>';
+      return provs.map(p => `<span class="tag">${esc(p)}</span>`).join('');
+    }
+
+    function renderRateLimits(t) {
+      const rpm = t.rpm ?? -1;
+      const rph = t.rph ?? -1;
+      const rpd = t.rpd ?? -1;
+      const rpt = t.rpt ?? -1;
+      if (rpm === -1 && rph === -1 && rpd === -1 && rpt === -1) {
+        return '<span style="color:#8b949e;font-size:11px">Unlimited</span>';
+      }
+      const parts = [];
+      if (rpm !== -1) parts.push(`<span style="color:#58a6ff" title="RPM">${rpm}</span>`);
+      if (rph !== -1) parts.push(`<span style="color:#58a6ff" title="RPH">${rph}</span>`);
+      if (rpd !== -1) parts.push(`<span style="color:#58a6ff" title="RPD">${rpd}</span>`);
+      if (rpt !== -1) parts.push(`<span style="color:#58a6ff" title="RPT">${rpt}</span>`);
+      return parts.join(' <span style="color:#30363d">|</span> ');
+    }
+
+    function fmtNum(n) {
+      n = Number(n) || 0;
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+      return String(n);
+    }
+
+    function hitRateCell(cr, inp) {
+      const denom = (cr || 0) + (inp || 0);
+      if (!denom) return '<td>-</td>';
+      const r = (cr || 0) / denom;
+      const pct = (r * 100).toFixed(1);
+      const cls = r >= 0.95 ? 'ut-cr' : (r >= 0.8 ? 'ut-in' : 'ut-cw');
+      return `<td class="${cls}">${pct}%</td>`;
+    }
+
+    function windowDetail(windowData) {
+      const d = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+      if (!windowData || !windowData.tokens) return d;
+      for (const p in windowData.tokens) {
+        const tk = windowData.tokens[p] || {};
+        d.input += tk.input || 0;
+        d.output += tk.output || 0;
+        d.cache_read += tk.cache_read || 0;
+        d.cache_write += tk.cache_write || 0;
+      }
+      return d;
+    }
+
+    function miniStack(d) {
+      const total = (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_write || 0);
+      if (!total) return '<div class="mini-stack"></div>';
+      const parts = [
+        ['seg-in', d.input || 0],
+        ['seg-out', d.output || 0],
+        ['seg-cr', d.cache_read || 0],
+        ['seg-cw', d.cache_write || 0],
+      ].filter(([, v]) => v > 0);
+      const segs = parts.map(([cls, v]) => {
+        const w = (v / total * 100).toFixed(2);
+        return `<div class="seg ${cls}" style="width:${w}%"></div>`;
+      }).join('');
+      return `<div class="mini-stack">${segs}</div>`;
+    }
+
+    function usageTooltip(windowData) {
+      if (!windowData || !windowData.tokens) {
+        return '<div class="ut-empty">No token usage data</div>';
+      }
+      const tokens = windowData.tokens || {};
+      const providers = Object.keys(tokens);
+      if (providers.length === 0) {
+        return '<div class="ut-empty">No token usage data</div>';
+      }
+      const cell = (v, dotCls, valCls) => '<td class="' + (valCls || '') + '">' + fmtNum(v) + '</td>';
+      let totIn = 0, totOut = 0, totCR = 0, totCW = 0;
+      const rows = providers.map(p => {
+        const tk = tokens[p] || {};
+        totIn += tk.input || 0; totOut += tk.output || 0;
+        totCR += tk.cache_read || 0; totCW += tk.cache_write || 0;
+        return '<tr>'
+          + '<td class="ut-prov">' + esc(p) + '</td>'
+          + cell(tk.input, 'dot-in', 'ut-in')
+          + cell(tk.output, 'dot-out', 'ut-out')
+          + cell(tk.cache_read, 'dot-cr', 'ut-cr')
+          + cell(tk.cache_write, 'dot-cw', 'ut-cw')
+          + hitRateCell(tk.cache_read, tk.input)
+          + '</tr>';
+      });
+      rows.push('<tr class="ut-total">'
+        + '<td class="ut-prov">Total</td>'
+        + cell(totIn, 'dot-in', 'ut-in')
+        + cell(totOut, 'dot-out', 'ut-out')
+        + cell(totCR, 'dot-cr', 'ut-cr')
+        + cell(totCW, 'dot-cw', 'ut-cw')
+        + hitRateCell(totCR, totIn)
+        + '</tr>');
+      const head = '<thead><tr>'
+        + '<th>Provider</th>'
+        + '<th>In</th>'
+        + '<th>Out</th>'
+        + '<th>CR</th>'
+        + '<th>CW</th>'
+        + '<th>命中率</th>'
+        + '</tr></thead>';
+      return '<div class="ut-title">Token Usage</div><table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
+    }
+
+    function renderRow(t, usageMap) {
+      const adminBadge = t.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-user">User</span>';
+      const shortToken = t.token.slice(0, 6);
+      const u = usageMap[t.token] || {};
+      const req1d = (u['1d'] && u['1d'].requests != null) ? u['1d'].requests : (u['1d'] || 0);
+      const req7d = (u['7d'] && u['7d'].requests != null) ? u['7d'].requests : (u['7d'] || 0);
+      const req30d = (u['30d'] && u['30d'].requests != null) ? u['30d'].requests : (u['30d'] || 0);
+      return `<tr data-token="${esc(t.token)}">
+    <td class="token-cell" data-full="${esc(t.token)}">${esc(shortToken)}...</td>
+    <td style="font-size:12px;color:#8b949e;white-space:nowrap" title="${esc(t.describe || '')}">${esc(t.describe || '-')}</td>
+    <td><div class="providers-cell">${renderProviders(t.providers)}</div></td>
+    <td>${adminBadge}</td>
+    <td>
+      <label class="toggle">
+        <input type="checkbox" ${t.enabled ? 'checked' : ''} onchange="toggleEnabled(this, '${esc(t.token)}')">
+        <span class="slider"></span>
+      </label>
+    </td>
+    <td style="font-size:11px">${renderRateLimits(t)}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['1d']))}"><div class="uc-num">${req1d}</div>${miniStack(windowDetail(u['1d']))}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['7d']))}"><div class="uc-num">${req7d}</div>${miniStack(windowDetail(u['7d']))}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['30d']))}"><div class="uc-num">${req30d}</div>${miniStack(windowDetail(u['30d']))}</td>
+    <td style="font-size:12px;color:#8b949e">${fmtDate(t.created_at)}</td>
+    <td>
+      <button class="btn btn-sm" onclick="showEditModal('${esc(t.token)}')">Edit</button>
+      <button class="btn btn-sm" onclick="openUsage('${esc(t.token)}')">Usage</button>
+      <button class="btn btn-sm btn-danger" onclick="confirmDelete('${esc(t.token)}')">Delete</button>
+    </td>
+  </tr>`;
+    }
+
+    async function loadTokens() {
+      const [tokensRes, usageRes] = await Promise.all([
+        api('GET', '/admin/api/tokens'),
+        api('GET', '/admin/api/tokens/usage'),
+      ]);
+      if (!tokensRes.ok) {
+        toast(tokensRes.data.error || 'Failed to load tokens');
+        return;
+      }
+      const usageMap = usageRes.ok ? (usageRes.data.usage || {}) : {};
+      const tbody = document.getElementById('token-tbody');
+      if (!tokensRes.data.tokens || tokensRes.data.tokens.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="empty">No tokens</td></tr>';
+      } else {
+        tbody.innerHTML = tokensRes.data.tokens.map(t => renderRow(t, usageMap)).join('');
+      }
+      const total = tokensRes.data.tokens ? tokensRes.data.tokens.length : 0;
+      const admins = tokensRes.data.tokens ? tokensRes.data.tokens.filter(t => t.is_admin).length : 0;
+      document.getElementById('token-count').textContent = `${total} token(s)`;
+      document.getElementById('stats').textContent = `${admins} admin(s) / ${total} total`;
+    }
+
+    function buildProviderCheckboxes(containerId, selected) {
+      const c = document.getElementById(containerId);
+      const allOpts = ['*', ...PROVIDERS];
+      c.innerHTML = allOpts.map(p => {
+        const checked = selected.includes(p) ? 'checked' : '';
+        return `<label><input type="checkbox" value="${esc(p)}" ${checked}>${esc(p === '*' ? '* (all)' : p)}</label>`;
+      }).join('');
+    }
+
+    function getSelectedProviders(containerId) {
+      const checks = document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`);
+      const vals = Array.from(checks).map(c => c.value);
+      return vals.includes('*') ? ['*'] : vals;
+    }
+
+    function showCreateModal() {
+      editingToken = null;
+      document.getElementById('modal-title').textContent = 'New Token';
+      document.getElementById('modal-token').value = '';
+      document.getElementById('modal-token').disabled = false;
+      document.getElementById('modal-describe').value = '';
+      document.getElementById('modal-admin').checked = false;
+      buildProviderCheckboxes('modal-providers', ['*']);
+      document.getElementById('modal-rpm').value = '-1';
+      document.getElementById('modal-rph').value = '-1';
+      document.getElementById('modal-rpd').value = '-1';
+      document.getElementById('modal-rpt').value = '-1';
+      document.getElementById('modal-submit').textContent = 'Create';
+      document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    async function showEditModal(token) {
+      const { ok, data } = await api('GET', '/admin/api/tokens');
+      if (!ok) {
+        toast(data.error || 'Failed to load tokens');
+        return;
+      }
+      const t = data.tokens ? data.tokens.find(x => x.token === token) : null;
+      if (!t) return;
+      editingToken = token;
+      document.getElementById('modal-title').textContent = 'Edit Token';
+      document.getElementById('modal-token').value = token;
+      document.getElementById('modal-token').disabled = false;
+      document.getElementById('modal-describe').value = t.describe || '';
+      document.getElementById('modal-admin').checked = t.is_admin;
+      buildProviderCheckboxes('modal-providers', t.providers);
+      document.getElementById('modal-rpm').value = t.rpm ?? -1;
+      document.getElementById('modal-rph').value = t.rph ?? -1;
+      document.getElementById('modal-rpd').value = t.rpd ?? -1;
+      document.getElementById('modal-rpt').value = t.rpt ?? -1;
+      document.getElementById('modal-submit').textContent = 'Save';
+      document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    function hideModal() {
+      document.getElementById('modal-overlay').classList.remove('active');
+    }
+
+    async function submitModal() {
+      const provs = getSelectedProviders('modal-providers');
+      const isAdmin = document.getElementById('modal-admin').checked;
+      const describe = document.getElementById('modal-describe').value.trim();
+      const rpm = parseInt(document.getElementById('modal-rpm').value) || -1;
+      const rph = parseInt(document.getElementById('modal-rph').value) || -1;
+      const rpd = parseInt(document.getElementById('modal-rpd').value) || -1;
+      const rpt = parseInt(document.getElementById('modal-rpt').value) || -1;
+      let result;
+      if (!editingToken) {
+        const customToken = document.getElementById('modal-token').value.trim();
+        result = await api('POST', '/admin/api/tokens', {
+          token: customToken || undefined,
+          providers: provs,
+          is_admin: isAdmin,
+          describe: describe,
+          rpm, rph, rpd, rpt,
+        });
+      } else {
+        const tokenValue = document.getElementById('modal-token').value.trim();
+        result = await api('PUT', '/admin/api/tokens', {
+          token: editingToken,
+          new_token: tokenValue,
+          providers: provs,
+          is_admin: isAdmin,
+          describe: describe,
+          rpm, rph, rpd, rpt,
+        });
+      }
+      if (!result.ok) {
+        toast(result.data.error || 'Operation failed');
+        return;
+      }
+      // If the edited token was renamed, keep the session valid when an admin
+      // renames their own token.
+      if (editingToken && result.data && result.data.token && result.data.token.token !== editingToken) {
+        if (editingToken === adminToken) {
+          adminToken = result.data.token.token;
+          if (localStorage.getItem('admin_token')) {
+            localStorage.setItem('admin_token', adminToken);
+          }
+        }
+      }
+      hideModal();
+      await loadTokens();
+      toast(editingToken ? 'Token updated' : 'Token created', 'success');
+    }
+
+    async function toggleEnabled(checkbox, token) {
+      const newVal = checkbox.checked;
+      const result = await api('PUT', '/admin/api/tokens', {
+        token: token,
+        enabled: newVal,
+      });
+      if (!result.ok) {
+        toast(result.data.error || 'Failed to update');
+        checkbox.checked = !newVal;
+        return;
+      }
+      await loadTokens();
+    }
+
+    let _confirmResolve = null;
+
+    function showConfirm(msg) {
+      document.getElementById('confirm-message').textContent = msg;
+      document.getElementById('confirm-overlay').classList.add('active');
+      return new Promise(resolve => { _confirmResolve = resolve; });
+    }
+
+    function confirmOk() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+    }
+
+    function confirmCancel() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+    }
+
+    async function confirmDelete(token) {
+      const ok = await showConfirm('Delete token ' + token.slice(0, 20) + '...?');
+      if (ok) {
+        await deleteToken(token);
+      }
+    }
+
+    function openUsage(token) {
+      const row = document.querySelector(`tr[data-token="${CSS.escape(token)}"]`);
+      const desc = row ? (row.querySelector('td:nth-child(2)')?.title || '') : '';
+      localStorage.setItem('_usage_token', JSON.stringify({ t: token, d: desc }));
+      window.open('/usage', '_blank');
+    }
+
+    async function deleteToken(token) {
+      const result = await api('DELETE', '/admin/api/tokens', { token });
+      if (!result.ok) {
+        toast(result.data.error || 'Failed to delete');
+        return;
+      }
+      await loadTokens();
+      toast('Token deleted', 'success');
+    }
+
+    document.getElementById('modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) hideModal();
+    });
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      if (!token) {
+        document.getElementById('login-error').textContent = 'Please enter a token';
+        return;
+      }
+      document.getElementById('login-error').textContent = '';
+      try {
+        const resp = await fetch('/admin/api/tokens', {
+          headers: { 'X-Admin-Token': token },
+        });
+        if (resp.status === 403) {
+          document.getElementById('login-error').textContent = 'Invalid admin token';
+          return;
+        }
+        if (!resp.ok) {
+          document.getElementById('login-error').textContent = 'Login failed';
+          return;
+        }
+        adminToken = token;
+        localStorage.setItem('admin_token', document.getElementById('login-remember').checked ? token : '');
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('admin-content').classList.add('active');
+        loadTokens();
+      } catch (e) {
+        document.getElementById('login-error').textContent = 'Network error';
+      }
+    }
+
+    function doLogout() {
+      adminToken = null;
+      localStorage.removeItem('admin_token');
+      document.getElementById('login-token').value = '';
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('admin-content').classList.remove('active');
+    }
+
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    (function autoLogin() {
+      const saved = localStorage.getItem('admin_token');
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        doLogin();
+      }
+    })();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+
+# Config & secrets
+config.toml
+.env
+
+# Runtime data
+*.db
+*.bak
+logs/
+intercept_logs/
+data/
+pool.json
+
+# Lock & version
+uv.lock
+.python-version
+
+# Service
+*.service
+
+# Tool directories
+.opencode/
+.claude/
+
+# Development documentation
+docs/
+# ZCode agent
+.zcode/

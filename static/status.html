@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Status</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .provider-name {
+      font-size: 16px;
+      color: #58a6ff;
+      margin-bottom: 4px
+    }
+
+    .provider-meta {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 12px
+    }
+
+    .provider-meta code {
+      color: #79c0ff;
+      background: #0d1117;
+      padding: 1px 5px;
+      border-radius: 3px
+    }
+
+    .summary-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 14px;
+      flex-wrap: wrap
+    }
+
+    .summary-item-inline {
+      text-align: center;
+      font-size: 12px
+    }
+
+    .summary-item-inline .val-total {
+      display: block;
+      font-size: 18px;
+      font-weight: 700;
+      color: #c9d1d9;
+      font-variant-numeric: tabular-nums
+    }
+
+    .summary-item-inline .detail-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+      font-size: 11px
+    }
+
+    .summary-item-inline .detail-item {
+      display: flex;
+      align-items: center;
+      gap: 2px
+    }
+
+    .summary-item-inline .lbl {
+      display: block;
+      color: #8b949e;
+      font-size: 11px;
+      margin-top: 3px
+    }
+
+    .rate-bar-container {
+      margin-bottom: 12px
+    }
+
+    .rate-label {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between
+    }
+
+    .rate-bar-bg {
+      background: #21262d;
+      border-radius: 4px;
+      height: 20px;
+      overflow: hidden;
+      position: relative
+    }
+
+    .rate-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .5s
+    }
+
+    .rate-value {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+      z-index: 1
+    }
+
+    .timeline-section h4 {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 8px
+    }
+
+    .timeline {
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      height: 48px;
+      padding: 4px 0;
+      cursor: crosshair;
+      overflow: hidden;
+      justify-content: flex-end
+    }
+
+    .hour-bar {
+      min-width: 5px;
+      flex: 1 1 0;
+      border-radius: 1px 1px 0 0;
+      position: relative;
+      transition: opacity .15s, transform .1s;
+      height: 100%
+    }
+
+
+    .hour-bar:hover {
+      opacity: 1 !important;
+      transform: scaleY(1.15);
+      z-index: 10
+    }
+
+    .tooltip {
+      position: fixed;
+      z-index: 500;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      font-size: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
+      display: none;
+      min-width: 200px;
+      line-height: 1.6
+    }
+
+    .tooltip.show {
+      display: block
+    }
+
+    .tooltip-time {
+      color: #58a6ff;
+      font-weight: 600;
+      margin-bottom: 4px
+    }
+
+    .tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px
+    }
+
+    .tooltip-rate {
+      font-weight: 600
+    }
+
+    .tooltip-errors {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #8b949e
+    }
+
+    .error-section {
+      margin-top: 12px
+    }
+
+    .error-section h4 {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 6px
+    }
+
+    .error-table td,
+    .error-table th {
+      padding: 4px 10px;
+      font-size: 12px
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: monospace
+    }
+
+    .status-2xx {
+      background: #0d2818;
+      color: #3fb950
+    }
+
+    .status-4xx {
+      background: #341a00;
+      color: #d29922
+    }
+
+    .status-5xx {
+      background: #3d1214;
+      color: #f85149
+    }
+
+    .uptime-display {
+      font-size: 13px;
+      color: #8b949e
+    }
+
+    .uptime-display span {
+      color: #3fb950;
+      font-weight: 600
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 20px;
+      color: #484f58;
+      font-size: 13px
+    }
+
+    .time-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #484f58;
+      padding: 2px 0 0;
+      margin-top: -2px
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>Service Status</h1>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="uptime-display">Uptime: <span id="uptime">-</span></div>
+      <button class="btn btn-sm" onclick="loadStatus()">Refresh</button>
+    </div>
+  </div>
+  <div class="container" id="content">
+    <div class="loading">Loading...</div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function formatUptime(seconds) {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const parts = [];
+      if (d > 0) parts.push(d + 'd');
+      if (h > 0) parts.push(h + 'h');
+      parts.push(m + 'm');
+      return parts.join(' ');
+    }
+
+    function rateColor(rate) {
+      if (rate === null || rate === undefined) return '#30363d';
+      const t = Math.max(0, Math.min(100, rate)) / 100;
+      // 0→50%: #da3633(red) → #d29922(yellow)
+      // 50%→100%: #d29922(yellow) → #238636(green)
+      const r = t < 0.5
+        ? 218 - (218 - 210) * (t * 2)
+        : 210 - (210 - 35) * ((t - 0.5) * 2);
+      const g = t < 0.5
+        ? 54 + (153 - 54) * (t * 2)
+        : 153 + (134 - 153) * ((t - 0.5) * 2);
+      const b = t < 0.5
+        ? 51 + (34 - 51) * (t * 2)
+        : 34 + (54 - 34) * ((t - 0.5) * 2);
+      return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+    }
+
+    function rateColorClass(rate) {
+      if (rate === null || rate === undefined) return '';
+      if (rate >= 99) return 'green';
+      if (rate >= 95) return 'yellow';
+      return 'red';
+    }
+
+    function statusClass(code) {
+      if (code < 300) return 'status-2xx';
+      if (code < 500) return 'status-4xx';
+      return 'status-5xx';
+    }
+
+    function fmtHour(ts) {
+      const d = new Date(ts * 1000);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:00`;
+    }
+
+    function fmtHourFull(ts) {
+      const d = new Date(ts * 1000);
+      return d.toLocaleString();
+    }
+
+    const tooltip = document.getElementById('tooltip');
+
+    function showTooltip(el, data) {
+      const rect = el.getBoundingClientRect();
+      let html = `<div class="tooltip-time">${esc(fmtHourFull(data.ts))}</div>`;
+      html += `<div class="tooltip-row"><span>Total:</span><span>${data.total}</span></div>`;
+      if (data.success_rate !== null && data.total > 0) {
+        html += `<div class="tooltip-row"><span>Success:</span><span class="tooltip-rate" style="color:${rateColor(data.success_rate)}">${data.success_rate}%</span></div>`;
+      } else if (data.total === 0) {
+        html += `<div class="tooltip-row"><span>Status:</span><span style="color:#484f58">No requests</span></div>`;
+      }
+      const errors = data.error_distribution || {};
+      if (Object.keys(errors).length > 0) {
+        html += '<div class="tooltip-errors">';
+        for (const [code, count] of Object.entries(errors)) {
+          const pct = data.total > 0 ? (count / data.total * 100).toFixed(1) : '0.0';
+          html += `<div class="tooltip-row"><span class="status-badge ${statusClass(parseInt(code))}">${code}</span><span>${count} (${pct}%)</span></div>`;
+        }
+        html += '</div>';
+      }
+      tooltip.innerHTML = html;
+
+      let left = rect.left + rect.width / 2 - 110;
+      let top = rect.top - 200;
+      if (left < 4) left = 4;
+      if (left + 220 > window.innerWidth) left = window.innerWidth - 224;
+      // 默认显示在上方；如果上方空间不够则显示在下方
+      if (top < 0) top = rect.bottom + 8;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+      tooltip.classList.add('show');
+    }
+
+    function hideTooltip() {
+      tooltip.classList.remove('show');
+    }
+
+    document.addEventListener('mouseleave', e => {
+      if (!e.target.closest('.timeline')) hideTooltip();
+    });
+
+    function renderTimeline(hourlyData) {
+      if (!hourlyData || hourlyData.length === 0) {
+        return '<div class="no-data">No hourly data yet</div>';
+      }
+
+      const bars = hourlyData.map((h, i) => {
+        const r = h.success_rate;
+        const color = rateColor(r);
+        const hasData = h.total > 0;
+        const opacity = hasData ? 1 : 0.25;
+        const title = hasData ? `${fmtHour(h.ts)} — ${r !== null ? r : 'N/A'}% success, ${h.total} req` : `${fmtHour(h.ts)} — no requests`;
+        return `<div class="hour-bar"
+          style="background:${color};opacity:${opacity}"
+          data-idx="${i}"
+          onmouseenter="onBarHover(this)"
+          onmouseleave="hideTooltip()"
+          title="${esc(title)}"
+        ></div>`;
+      }).join('');
+
+      const firstTs = hourlyData[0].ts;
+      const lastTs = hourlyData[hourlyData.length - 1].ts;
+      const axisLabels = [fmtHour(firstTs), fmtHour(lastTs)];
+
+      return `
+        <div class="timeline">${bars}</div>
+        <div class="time-axis"><span>${esc(axisLabels[0])}</span><span>${esc(axisLabels[1])}</span></div>
+      `;
+    }
+
+    window.onBarHover = function(el) {
+      const idx = parseInt(el.dataset.idx);
+      const providerEl = el.closest('.card');
+      const pname = providerEl.dataset.provider;
+      const allData = window._statusData;
+      if (!allData || !allData[pname] || !allData[pname][idx]) return;
+      showTooltip(el, allData[pname][idx]);
+    };
+
+    function renderProvider(p, hourly, summary) {
+      const s24 = summary ? summary['24h'] : null;
+      const rate24 = s24 ? s24.success_rate : null;
+      const rate24Display = rate24 !== null ? rate24 + '%' : 'N/A';
+      const rate24Width = rate24 !== null ? rate24 : 100;
+
+      const errors24 = s24 ? s24.error_distribution : {};
+      const total24 = s24 ? s24.total : 0;
+      const errorRows = Object.entries(errors24).sort((a, b) => b[1] - a[1]).map(([code, count]) => {
+        const pct = total24 > 0 ? (count / total24 * 100).toFixed(2) : '0.00';
+        return `<tr>
+          <td><span class="status-badge ${statusClass(parseInt(code))}">${esc(code)}</span></td>
+          <td>${count}</td>
+          <td>${pct}%</td>
+        </tr>`;
+      }).join('');
+
+      const errorSection = Object.keys(errors24).length > 0
+        ? `<div class="error-section">
+            <h4>Error Codes (24h)</h4>
+            <table class="error-table">
+              <thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead>
+              <tbody>${errorRows}</tbody>
+            </table>
+          </div>`
+        : '';
+
+      const summaryHtml = ['1h', '24h', '7d', '30d'].map(period => {
+        const d = summary ? summary[period] : null;
+        const total = d ? d.total : 0;
+        const success = d ? d.success : 0;
+        const fail = total - success;
+        const rate = d ? d.success_rate : null;
+        const rateColorVal = rate !== null ? rateColor(rate) : '#484f58';
+        const rateText = rate !== null ? rate + '%' : '-';
+        const failColor = fail > 0 ? '#f85149' : '#484f58';
+        const succColor = success > 0 ? '#3fb950' : '#484f58';
+        return `<div class="summary-item-inline">
+          <span class="val-total">${total.toLocaleString()}</span>
+          <div class="detail-row">
+            <span class="detail-item" style="color:${succColor}">${success}</span>
+            <span class="detail-item" style="color:${failColor}">${fail}</span>
+            <span class="detail-item" style="color:${rateColorVal}">${rateText}</span>
+          </div>
+          <span class="lbl">${period}</span>
+        </div>`;
+      }).join('');
+
+      return `<div class="card" data-provider="${esc(p.name)}">
+        <div class="provider-name">${esc(p.name)}</div>
+        <div class="provider-meta">
+          Prefix: <code>${esc(p.prefix)}</code> &nbsp; Upstream: <code>${esc(p.upstream)}</code>
+        </div>
+        <div class="summary-row">${summaryHtml}</div>
+        <div class="rate-bar-container">
+          <div class="rate-label"><span>Success Rate (24h)</span><span>${rate24Display}</span></div>
+          <div class="rate-bar-bg">
+            <div class="rate-bar-fill ${rateColorClass(rate24)}" style="width:${rate24Width}%;background:${rateColor(rate24)}"></div>
+          </div>
+        </div>
+        <div class="timeline-section">
+          <h4>Hourly Timeline (last ${hourly ? hourly.length : 0} hours)</h4>
+          ${renderTimeline(hourly)}
+        </div>
+        ${errorSection}
+      </div>`;
+    }
+
+    async function loadStatus() {
+      try {
+        const resp = await fetch('/status/api');
+        const data = await resp.json();
+        document.getElementById('uptime').textContent = formatUptime(data.uptime);
+
+        window._statusData = data.stats || {};
+
+        const content = document.getElementById('content');
+        if (!data.providers || data.providers.length === 0) {
+          content.innerHTML = '<div class="no-data">No providers configured</div>';
+          return;
+        }
+        const providerOrder = [...data.providers].sort((a, b) => {
+          const ta = ((data.summary || {})[a.name] || {})['24h'] || {};
+          const tb = ((data.summary || {})[b.name] || {})['24h'] || {};
+          return (tb.total || 0) - (ta.total || 0);
+        });
+        content.innerHTML = providerOrder.map(p => {
+          const hourly = (data.stats || {})[p.name] || [];
+          const summary = (data.summary || {})[p.name] || null;
+          return renderProvider(p, hourly, summary);
+        }).join('');
+      } catch (e) {
+        document.getElementById('content').innerHTML = `<div class="error-msg">Failed to load status: ${esc(e.message)}</div>`;
+      }
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 600000);
+  </script>
+</body>
+
+</html>

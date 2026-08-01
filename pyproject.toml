@@ -1,0 +1,32 @@
+[project]
+name = "onegate"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.13.3",
+    "brotli>=1.2.0",
+    "litellm>=1.83.14",
+    "proxy-py>=2.4.10",
+    "python-dotenv>=1.2.2",
+    "toml>=0.10.2",
+]
+
+[project.optional-dependencies]
+compression = [
+    "brotli>=1.0.0",
+    "zstandard>=0.20.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-aiohttp>=1.0.0",
+    "aioresponses>=0.7.6",
+]
+
+[dependency-groups]
+dev = [
+    "aiohttp>=3.13.3",
+    "pytest>=9.0.2",
+    "ruff>=0.15.7",
+]

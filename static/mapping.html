@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Mapping</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px
+    }
+
+    .toolbar h2 {
+      font-size: 14px;
+      color: #8b949e
+    }
+
+    table {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: center
+    }
+
+    td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      text-align: center
+    }
+
+    .add-form {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .add-form .form-group {
+      flex: 1;
+      min-width: 180px
+    }
+
+    .add-form .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .add-form input[type=text] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: monospace
+    }
+
+    .add-form input[type=text]:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .arrow {
+      color: #58a6ff;
+      font-size: 20px;
+      flex-shrink: 0;
+      padding-top: 22px
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: opacity .3s, transform .3s;
+      max-width: 400px;
+      word-break: break-word
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0)
+    }
+
+    .toast-error {
+      background: #da3633;
+      border: 1px solid #f85149
+    }
+
+    .toast-success {
+      background: #238636;
+      border: 1px solid #2ea043
+    }
+
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d1117;
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.hidden {
+      display: none
+    }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 420px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 8px
+    }
+
+    .login-box .subtitle {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group {
+      margin-bottom: 16px
+    }
+
+    .login-box .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .login-box .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      border-radius: 6px;
+      font-family: monospace
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input {
+      accent-color: #238636
+    }
+
+    .mapping-content {
+      display: none
+    }
+
+    .mapping-content.active {
+      display: block
+    }
+
+    .pattern-cell {
+      font-family: monospace;
+      font-size: 13px;
+      color: #f0883e;
+      word-break: break-all
+    }
+
+    .target-cell {
+      font-family: monospace;
+      font-size: 13px;
+      color: #3fb950;
+      word-break: break-all
+    }
+
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 300;
+      justify-content: center;
+      align-items: center
+    }
+
+    .confirm-overlay.active {
+      display: flex
+    }
+
+    .confirm-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      width: 360px;
+      max-width: 90vw
+    }
+
+    .confirm-box p {
+      font-size: 14px;
+      color: #c9d1d9;
+      margin-bottom: 20px;
+      word-break: break-all
+    }
+
+    .confirm-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end
+    }
+
+    .rules-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 24px
+    }
+
+    .rules-card h3 {
+      font-size: 13px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 12px
+    }
+
+    .rules-table {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      overflow: hidden
+    }
+
+    .rules-table th {
+      background: #161b22;
+      padding: 8px 12px;
+      font-size: 12px;
+      text-align: center
+    }
+
+    .rules-table td {
+      padding: 8px 12px;
+      font-size: 13px;
+      text-align: center;
+      border-top: 1px solid #21262d
+    }
+
+    .rules-table code {
+      background: #1c2128;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #f0883e
+    }
+
+    .match-yes {
+      color: #3fb950;
+      font-weight: 600;
+      font-size: 12px
+    }
+
+    .match-no {
+      color: #484f58;
+      font-size: 12px
+    }
+
+    .rules-note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Model Mapping</h2>
+      <div class="subtitle">Enter your proxy token to manage model mapping rules</div>
+      <div class="form-group">
+        <label>Proxy Token</label>
+        <input type="text" id="login-token" placeholder="enter your proxy token..." autofocus>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+
+  <div class="mapping-content" id="mapping-content">
+    <div class="header">
+      <h1>Model Mapping</h1>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="info" id="token-info"></div>
+        <button class="btn btn-sm" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="toolbar">
+        <h2 id="mapping-count"></h2>
+        <button class="btn" onclick="loadMappings()">Refresh</button>
+      </div>
+
+      <div class="add-form">
+        <div class="form-group">
+          <label>Pattern</label>
+          <input type="text" id="add-pattern" placeholder="e.g. glm-* or (.+-)(\\d+\\.\\d+)">
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="form-group">
+          <label>Target Model</label>
+          <input type="text" id="add-target" placeholder="e.g. glm-4 or $2">
+        </div>
+        <div class="form-group">
+          <label>Provider</label>
+          <select id="add-provider" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:13px;font-family:monospace">
+            <option value="">Default</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="add-btn" onclick="addMapping()" style="height:36px;flex-shrink:0">Add</button>
+        <button class="btn" id="cancel-btn" onclick="cancelEdit()" style="height:36px;flex-shrink:0;display:none">Cancel</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:25%">Pattern</th>
+            <th style="width:8%">Arrow</th>
+            <th style="width:25%">Target Model</th>
+            <th style="width:22%">Provider</th>
+            <th style="width:20%">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="mapping-tbody"></tbody>
+      </table>
+
+      <div class="rules-card">
+        <h3>Matching Rules</h3>
+        <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Patterns are first tried as <strong>regex</strong> (fullmatch), then fallback to <strong>fnmatch wildcards</strong>. Use <code>$1</code> <code>$2</code> ... in target to reference regex capture groups.</p>
+        <table class="rules-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Pattern</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Regex</td><td><code>(.+)-(\d+\.\d+)</code></td><td>Capture name and version into $1 and $2</td></tr>
+            <tr><td>Regex</td><td><code>glm-(.+)</code></td><td>Capture suffix after "glm-" into $1</td></tr>
+            <tr><td>Regex</td><td><code>(.*)</code></td><td>Match everything, capture into $1</td></tr>
+            <tr><td>Wildcard</td><td><code>*</code></td><td>Match any number of characters</td></tr>
+            <tr><td>Wildcard</td><td><code>?</code></td><td>Match exactly one character</td></tr>
+            <tr><td>Wildcard</td><td><code>[seq]</code></td><td>Match any character in <code>seq</code></td></tr>
+            <tr><td>Wildcard</td><td><code>[!seq]</code></td><td>Match any character not in <code>seq</code></td></tr>
+          </tbody>
+        </table>
+        <h3 style="margin-top:16px">Examples</h3>
+        <table class="rules-table">
+          <thead>
+            <tr>
+              <th>Pattern</th>
+              <th>Target</th>
+              <th>Input Model</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>glm-*</code></td><td><code>glm-5.1</code></td><td><code>glm-5.4</code></td><td class="match-yes">glm-5.1</td></tr>
+            <tr><td><code>glm-(.+)</code></td><td><code>glm-$1</code></td><td><code>glm-5.4</code></td><td class="match-yes">glm-5.4</td></tr>
+            <tr><td><code>(.+)-flash</code></td><td><code>$1-4o</code></td><td><code>gpt-flash</code></td><td class="match-yes">gpt-4o</td></tr>
+            <tr><td><code>gpt-4*</code></td><td><code>gpt-4o</code></td><td><code>gpt-4o-mini</code></td><td class="match-yes">gpt-4o</td></tr>
+            <tr><td><code>gpt-4*</code></td><td><code>gpt-4o</code></td><td><code>claude-3</code></td><td class="match-no">No match</td></tr>
+          </tbody>
+        </table>
+        <div class="rules-note">Matching is case-sensitive. Regex patterns are tried first (fullmatch); if they fail or are invalid, fnmatch wildcard matching is used. Rules are matched in order; the first match wins. Unmatched model names are forwarded unchanged.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <p id="confirm-message"></p>
+      <div class="confirm-actions">
+        <button class="btn" onclick="confirmCancel()">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmOk()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    let proxyToken = null;
+    let _confirmResolve = null;
+
+    function apiHeaders() {
+      return { 'Content-Type': 'application/json', 'X-Proxy-Token': proxyToken };
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: apiHeaders() };
+      if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + path, opts);
+      const data = await resp.json();
+      return { ok: resp.ok, status: resp.status, data };
+    }
+
+    function toast(msg, type) {
+      type = type || 'error';
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + type;
+      el.textContent = msg;
+      document.getElementById('toast-container').appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function escAttr(s) {
+      return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const PROVIDERS = /*__PROVIDERS__*/[];
+    const PROVIDER_MAP = {};
+    PROVIDERS.forEach(name => { PROVIDER_MAP[name] = name; });
+
+    function renderRow(m, idx) {
+      const provDisplay = m.provider ? esc(m.provider) : '<span style="color:#484f58">Default</span>';
+      return `<tr data-idx="${idx}">
+        <td class="pattern-cell">${esc(m.pattern)}</td>
+        <td><span style="color:#58a6ff;font-size:16px">&rarr;</span></td>
+        <td class="target-cell">${esc(m.target)}</td>
+        <td>${provDisplay}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" data-action="edit" data-idx="${idx}">Edit</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-idx="${idx}">Delete</button>
+        </td>
+      </tr>`;
+    }
+
+    let cachedMappings = [];
+
+    async function loadMappings() {
+      const result = await api('GET', '/mapping/api');
+      if (!result.ok) {
+        if (result.status === 401 || result.status === 403) {
+          doLogout();
+          return;
+        }
+        toast(result.data.error || 'Failed to load mappings');
+        return;
+      }
+      const mappings = result.data.mappings || [];
+      cachedMappings = mappings;
+      const tbody = document.getElementById('mapping-tbody');
+      if (mappings.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No mapping rules. Models will be forwarded unchanged.</td></tr>';
+      } else {
+        tbody.innerHTML = mappings.map((m, i) => renderRow(m, i)).join('');
+      }
+      document.getElementById('mapping-count').textContent = `${mappings.length} rule(s)`;
+    }
+
+    async function addMapping() {
+      const pattern = document.getElementById('add-pattern').value.trim();
+      const target = document.getElementById('add-target').value.trim();
+      const provider = document.getElementById('add-provider').value;
+      if (!pattern || !target) {
+        toast('Pattern and target are required');
+        return;
+      }
+      const result = await api('POST', '/mapping/api', { pattern, target, provider });
+      if (!result.ok) {
+        toast(result.data.error || 'Failed to save mapping');
+        return;
+      }
+      if (editingPattern && editingPattern !== pattern) {
+        await api('DELETE', '/mapping/api', { pattern: editingPattern });
+      }
+      cancelEdit();
+      document.getElementById('add-pattern').value = '';
+      document.getElementById('add-target').value = '';
+      document.getElementById('add-provider').value = '';
+      await loadMappings();
+      toast(editingPattern ? 'Mapping updated' : 'Mapping added', 'success');
+      editingPattern = null;
+    }
+
+    function startEdit(pattern, target, provider) {
+      editingPattern = pattern;
+      document.getElementById('add-pattern').value = pattern;
+      document.getElementById('add-target').value = target;
+      document.getElementById('add-provider').value = provider || '';
+      document.getElementById('add-btn').textContent = 'Save';
+      document.getElementById('cancel-btn').style.display = '';
+      document.getElementById('add-pattern').focus();
+    }
+
+    function cancelEdit() {
+      editingPattern = null;
+      document.getElementById('add-pattern').value = '';
+      document.getElementById('add-target').value = '';
+      document.getElementById('add-provider').value = '';
+      document.getElementById('add-btn').textContent = 'Add';
+      document.getElementById('cancel-btn').style.display = 'none';
+    }
+
+    function showConfirm(msg) {
+      document.getElementById('confirm-message').textContent = msg;
+      document.getElementById('confirm-overlay').classList.add('active');
+      return new Promise(resolve => { _confirmResolve = resolve; });
+    }
+
+    function confirmOk() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+    }
+
+    function confirmCancel() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+    }
+
+    async function confirmDelete(pattern) {
+      const ok = await showConfirm('Delete mapping: ' + pattern + ' ?');
+      if (!ok) return;
+      const result = await api('DELETE', '/mapping/api', { pattern });
+      if (!result.ok) {
+        toast(result.data.error || 'Failed to delete mapping');
+        return;
+      }
+      await loadMappings();
+      toast('Mapping deleted', 'success');
+    }
+
+    document.getElementById('add-pattern').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        document.getElementById('add-target').focus();
+      }
+    });
+
+    document.getElementById('add-target').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addMapping();
+    });
+
+    document.getElementById('mapping-tbody').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      const m = cachedMappings[idx];
+      if (!m) return;
+      if (btn.dataset.action === 'edit') {
+        startEdit(m.pattern, m.target, m.provider);
+      } else if (btn.dataset.action === 'delete') {
+        confirmDelete(m.pattern);
+      }
+    });
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      if (!token) {
+        document.getElementById('login-error').textContent = 'Please enter your proxy token';
+        return;
+      }
+      document.getElementById('login-error').textContent = '';
+      try {
+        const resp = await fetch('/mapping/api', {
+          headers: { 'X-Proxy-Token': token },
+        });
+        if (resp.status === 401) {
+          document.getElementById('login-error').textContent = 'Token is required';
+          return;
+        }
+        if (resp.status === 403) {
+          document.getElementById('login-error').textContent = 'Invalid or disabled token';
+          return;
+        }
+        if (!resp.ok) {
+          document.getElementById('login-error').textContent = 'Login failed';
+          return;
+        }
+        proxyToken = token;
+        localStorage.setItem('mapping_token', document.getElementById('login-remember').checked ? token : '');
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('mapping-content').classList.add('active');
+        const shortToken = token.length > 16 ? token.slice(0, 8) + '...' + token.slice(-6) : token;
+        document.getElementById('token-info').textContent = 'Token: ' + shortToken;
+        loadMappings();
+      } catch (e) {
+        document.getElementById('login-error').textContent = 'Network error';
+      }
+    }
+
+    function doLogout() {
+      proxyToken = null;
+      localStorage.removeItem('mapping_token');
+      document.getElementById('login-token').value = '';
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('mapping-content').classList.remove('active');
+    }
+
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    function populateProviderSelect() {
+      const sel = document.getElementById('add-provider');
+      PROVIDERS.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+    }
+
+    let editingPattern = null;
+    populateProviderSelect();
+
+    (function autoLogin() {
+      const saved = localStorage.getItem('mapping_token');
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        doLogin();
+      }
+    })();
+  </script>
+</body>
+
+</html>

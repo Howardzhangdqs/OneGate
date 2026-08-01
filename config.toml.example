@@ -1,0 +1,51 @@
+bind_port = 5678
+intercept_port = 0
+enable_log = false
+# log_format = "full"   # "full" = per-request .json with body (default), "headers" = daily .jsonl with headers only
+
+# banned_uas = ["Bun*"]  # Wildcard patterns (fnmatch) to block by User-Agent
+
+[timeout]
+total = 1800
+connect = 30
+sock_read = 900
+
+[compression]
+# Whether to decompress response body before writing to log files.
+# Supports: gzip, deflate, br (requires brotli package), zstd (requires zstandard package).
+decompress_log = true
+
+[pool]
+count = 10
+usage_db = "data/onegate.db"
+# admin_tokens = []  # Auto-generated on first startup if empty
+
+[providers.openai]
+prefix = "/oai"
+upstream = "https://api.openai.com"
+strip_prefix = true
+env_token = "TOKEN_OPENAI"
+
+[providers.anthropic]
+prefix = "/claude"
+upstream = "https://api.anthropic.com"
+strip_prefix = true
+env_token = "TOKEN_ANTHROPIC"
+
+[providers.grok]
+prefix = "/grok"
+upstream = "https://api.x.ai"
+strip_prefix = true
+env_token = "TOKEN_GROK"
+
+[providers.litellm]
+prefix = "/litellm/v1"
+upstream = "https://open.bigmodel.cn/api/coding/paas/v4"
+strip_prefix = true
+env_token = "TOKEN_ZHIPUAI"
+
+[providers.default]
+prefix = "/"
+upstream = "https://api.openai.com"
+strip_prefix = false
+env_token = "TOKEN_OPENAI"

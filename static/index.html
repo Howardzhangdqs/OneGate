@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneGate</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .hero {
+      text-align: center;
+      padding: 60px 24px 40px
+    }
+
+    .hero h1 {
+      font-size: 36px;
+      color: #58a6ff;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px
+    }
+
+    .hero p {
+      font-size: 15px;
+      color: #8b949e;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.6
+    }
+
+    .nav-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto
+    }
+
+    .nav-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 28px 24px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color .2s, box-shadow .2s, transform .15s;
+      display: flex;
+      flex-direction: column;
+      gap: 10px
+    }
+
+    .nav-card:hover {
+      border-color: #58a6ff;
+      box-shadow: 0 0 20px rgba(88, 166, 255, .12);
+      transform: translateY(-2px)
+    }
+
+    .nav-card .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #c9d1d9
+    }
+
+    .nav-card .desc {
+      font-size: 13px;
+      color: #8b949e;
+      line-height: 1.5
+    }
+
+    .nav-card .badge {
+      display: inline-block;
+      background: #238636;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      width: fit-content;
+      font-weight: 600
+    }
+
+    .nav-card .badge.public {
+      background: #30363d;
+      color: #8b949e
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>OneGate</h1>
+    <span class="info">Multi-Provider AI Reverse Proxy</span>
+  </div>
+
+  <div class="hero">
+    <h1>OneGate</h1>
+    <p>A unified gateway to multiple AI providers. Handles authentication, routing, rate limiting, and usage tracking so you can focus on building.</p>
+  </div>
+
+  <div class="container">
+    <div class="nav-grid">
+      <a class="nav-card" href="/status">
+        <span class="title">Service Status</span>
+        <span class="desc">Monitor provider health, request success rates, and hourly trend charts.</span>
+        <span class="badge public">Public</span>
+      </a>
+      <a class="nav-card" href="/usage">
+        <span class="title">Usage Query</span>
+        <span class="desc">Look up API call statistics by token with hourly, daily, and per-provider breakdowns.</span>
+        <span class="badge public">Token Required</span>
+      </a>
+      <a class="nav-card" href="/admin">
+        <span class="title">Token Admin</span>
+        <span class="desc">Create, edit, and delete proxy tokens. Configure rate limits and provider permissions.</span>
+        <span class="badge">Admin Only</span>
+      </a>
+      <a class="nav-card" href="/mapping">
+        <span class="title">Model Mapping</span>
+        <span class="desc">Define custom model name mapping rules with wildcard pattern matching for your token.</span>
+        <span class="badge public">Token Required</span>
+      </a>
+      <a class="nav-card" href="/throughput">
+        <span class="title">Throughput Monitor</span>
+        <span class="desc">Real-time monitoring of active requests, TPS, TTFT, and other key performance metrics.</span>
+        <span class="badge public">Token Required</span>
+      </a>
+    </div>
+  </div>
+</body>
+
+</html>

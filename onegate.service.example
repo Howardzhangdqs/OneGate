@@ -1,0 +1,15 @@
+[Unit]
+Description=OneGate
+After=network.target
+
+[Service]
+Type=simple
+User=your_username
+WorkingDirectory=/path/to/onegate
+ExecStart=/path/to/onegate/.venv/bin/python proxy.py
+Restart=on-failure
+RestartSec=3
+EnvironmentFile=/path/to/onegate/.env
+
+[Install]
+WantedBy=multi-user.target
