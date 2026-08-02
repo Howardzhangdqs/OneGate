@@ -205,6 +205,7 @@ class ThroughputTracker:
         self.provider = provider
         self.request_url = request_url
         self.target_url = target_url
+        self.request_headers = request_headers
 
         try:
             self.input_est = _estimate_input_tokens(request_body)

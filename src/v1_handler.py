@@ -6,8 +6,11 @@ import time
 
 from aiohttp import web
 
+from src.client_detect import detect_client
 from src.config import AppConfig
 from src.db import (
+    record_client_token_usage,
+    record_client_usage,
     record_success,
     record_token_usage,
     record_usage,
@@ -119,11 +122,13 @@ def create_v1_handlers(
         provider_name: str,
         response,
         is_stream: bool,
+        client: str = "unknown",
     ) -> None:
         if not proxy_token:
             return
         record_usage(db_conn, proxy_token, provider_name)
         record_success(db_conn, proxy_token, provider_name)
+        record_client_usage(db_conn, proxy_token, provider_name, client)
         usage = None
         try:
             if is_stream:
@@ -139,6 +144,9 @@ def create_v1_handlers(
             logger.warning("V1 usage extraction failed: %s", e)
         tin, tout, tcr, tcw = _litellm_usage_to_tuple(usage)
         record_token_usage(db_conn, proxy_token, provider_name, tin, tout, tcr, tcw)
+        record_client_token_usage(
+            db_conn, proxy_token, provider_name, client, tin, tout, tcr, tcw
+        )
 
     async def v1_chat_completions(request: web.Request) -> web.StreamResponse:
         import litellm
@@ -185,6 +193,7 @@ def create_v1_handlers(
         litellm_model = _get_litellm_model(target_provider, mapped_model)
         base_url = _get_litellm_base_url(target_provider)
         is_stream = _parse_request_stream(body)
+        client = detect_client(request.headers)
 
         try:
             req_obj = json.loads(body)
@@ -273,6 +282,7 @@ def create_v1_handlers(
                     target_provider.name,
                     response,
                     is_stream=True,
+                    client=client,
                 )
                 return resp
             else:
@@ -299,6 +309,7 @@ def create_v1_handlers(
                     target_provider.name,
                     response,
                     is_stream=False,
+                    client=client,
                 )
                 return web.Response(
                     text=resp_body,
@@ -381,6 +392,7 @@ def create_v1_handlers(
         base_url = _get_litellm_base_url(target_provider)
         is_stream = req_obj.get("stream", False)
         input_data = req_obj.get("input", "")
+        client = detect_client(request.headers)
 
         resp_kwargs: dict = {}
         for key in (
@@ -487,6 +499,7 @@ def create_v1_handlers(
                     target_provider.name,
                     stream_response,
                     is_stream=True,
+                    client=client,
                 )
                 return resp
             else:
@@ -517,6 +530,7 @@ def create_v1_handlers(
                     target_provider.name,
                     completion_response,
                     is_stream=False,
+                    client=client,
                 )
                 return web.Response(
                     text=resp_body,

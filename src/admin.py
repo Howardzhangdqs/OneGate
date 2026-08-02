@@ -4,6 +4,7 @@ import os
 
 from aiohttp import web
 
+from src.client_detect import client_label
 from src.config import AppConfig
 from src.db import (
     add_token,
@@ -11,6 +12,7 @@ from src.db import (
     delete_token,
     get_all_tokens,
     get_model_maps,
+    get_token_clients,
     get_tokens_usage_summary,
     is_admin_token,
     set_model_map,
@@ -175,6 +177,26 @@ def create_admin_handlers(
             return web.json_response({"error": "unauthorized"}, status=403)
 
         usage = get_tokens_usage_summary(db_conn)
+        for token, data in usage.items():
+            clients = get_token_clients(db_conn, token)
+            top = clients[0] if clients else None
+            data["clients"] = [
+                {
+                    "client": c["client"],
+                    "label": client_label(c["client"]),
+                    "requests": c["requests"],
+                }
+                for c in clients
+            ]
+            data["top_client"] = (
+                {
+                    "client": top["client"],
+                    "label": client_label(top["client"]),
+                    "requests": top["requests"],
+                }
+                if top
+                else None
+            )
         return web.json_response({"usage": usage})
 
     return (

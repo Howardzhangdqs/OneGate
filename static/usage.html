@@ -81,6 +81,18 @@
       min-width: 0
     }
 
+    .bar-fill {
+      height: 16px;
+      background: #1f6feb;
+      border-radius: 3px;
+      min-width: 2px;
+      transition: width .3s
+    }
+
+    .bar-fill.unknown {
+      background: #9e6a03
+    }
+
     .bar {
       height: 16px;
       background: #238636;
@@ -343,6 +355,31 @@
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Token Usage by Client</h3>
+          <span style="font-size:12px;color:#8b949e">Requests, token usage & cache hit rate per client tool</span>
+        </div>
+        <div id="clients-empty" class="loading">No client data in selected range</div>
+        <div class="table-wrap">
+          <table id="clients-table" style="display:none">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Req</th>
+                <th><span class="dot seg-in"></span>In</th>
+                <th><span class="dot seg-out"></span>Out</th>
+                <th><span class="dot seg-cr"></span>Cache R</th>
+                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>命中率</th>
+                <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
+              </tr>
+            </thead>
+            <tbody id="clients-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:8px">
             <h3 style="margin:0">Hourly Token Usage</h3>
             <span style="font-size:11px;color:#8b949e">(in + out + cache)</span>
@@ -536,6 +573,7 @@
       _lastData = { hourly: data.hourly, allProv };
       renderHourly({ hourly: data.hourly, allProv });
       renderTokens(data.tokens || {});
+      renderClients(data.clients || {});
     }
 
     function fmtNum(n) {
@@ -543,6 +581,52 @@
       if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
       if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
       return String(n);
+    }
+
+    const _clientLabels = {
+      'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode',
+      'zcode': 'ZCode', 'cursor': 'Cursor', 'aider': 'Aider', 'cline': 'Cline',
+      'roo-code': 'Roo Code', 'continue': 'Continue', 'github-copilot': 'GitHub Copilot',
+      'gemini-cli': 'Gemini CLI', 'cody': 'Cody', 'windsurf': 'Windsurf',
+      'kilo': 'Kilo', 'kilo-code': 'Kilo Code', 'qwen-code': 'Qwen Code',
+      'crush': 'Crush', 'goose': 'Goose', 'serena': 'Serena',
+      'python-openai': 'OpenAI SDK (Python)', 'node-openai': 'OpenAI SDK (Node)',
+      'unknown': 'Unknown'
+    };
+    function clientLabel(n) { return _clientLabels[n] || n; }
+
+    function renderClients(clientsDetail) {
+      const tableEl = document.getElementById('clients-table');
+      const emptyEl = document.getElementById('clients-empty');
+      const tbody = document.getElementById('clients-body');
+      const entries = Object.entries(clientsDetail).sort((a, b) =>
+        tokSum(b[1]) - tokSum(a[1]));
+      const hasData = entries.some(([, t]) =>
+        (t.requests || 0) || (t.input || 0) || (t.output || 0) ||
+        (t.cache_read || 0) || (t.cache_write || 0));
+      if (!hasData) {
+        tableEl.style.display = 'none';
+        emptyEl.style.display = '';
+        emptyEl.textContent = 'No client data in selected range';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      tableEl.style.display = '';
+      const maxVal = Math.max(...entries.map(([, t]) => tokSum(t)), 1);
+      const num = v => v ? fmtNum(v) : '-';
+      const cell = (v, cls) => `<td class="${cls || ''}">${num(v)}</td>`;
+      let totIn = 0, totOut = 0, totCR = 0, totCW = 0, totReq = 0;
+      const rows = entries.map(([name, t]) => {
+        totIn += t.input || 0; totOut += t.output || 0;
+        totCR += t.cache_read || 0; totCW += t.cache_write || 0;
+        totReq += t.requests || 0;
+        const d = { input: t.input || 0, output: t.output || 0, cache_read: t.cache_read || 0, cache_write: t.cache_write || 0 };
+        const stackW = Math.max(2, tokSum(d) / maxVal * 100).toFixed(1);
+        const isUnknown = name === 'unknown';
+        return `<tr><td class="pt-prov" ${isUnknown ? 'style="color:#d29922"' : ''}>${esc(clientLabel(name))}</td>${cell(t.requests || 0)}${cell(t.input, 'num-in')}${cell(t.output, 'num-out')}${cell(t.cache_read, 'num-cr')}${cell(t.cache_write, 'num-cw')}${hitRateCell(t.cache_read, t.input)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(d)}</div></td></tr>`;
+      });
+      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      tbody.innerHTML = rows.join('');
     }
 
     function renderTokens(tokensByProvider) {

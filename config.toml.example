@@ -3,6 +3,12 @@ intercept_port = 0
 enable_log = false
 # log_format = "full"   # "full" = per-request .json with body (default), "headers" = daily .jsonl with headers only
 
+# Client tool recognition is always on (no config needed): each request is
+# fingerprinted by User-Agent / headers into a client name (claude-code, codex,
+# opencode, zcode, cursor, ...) and recorded in client_usage_log. View the
+# breakdown at /clients and per-token at /usage. This is independent of
+# banned_uas below — recognized tools are NOT blocked unless matched there.
+
 # banned_uas = ["Bun*"]  # Wildcard patterns (fnmatch) to block by User-Agent
 
 [timeout]

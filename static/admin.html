@@ -586,6 +586,7 @@
             <th>7d</th>
             <th>30d</th>
             <th>Created</th>
+            <th>Top Tool</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -882,6 +883,26 @@
       return '<div class="ut-title">Token Usage</div><table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
     }
 
+    const _adminClientLabels = {
+      'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode',
+      'zcode': 'ZCode', 'cursor': 'Cursor', 'aider': 'Aider', 'cline': 'Cline',
+      'roo-code': 'Roo Code', 'continue': 'Continue', 'github-copilot': 'GitHub Copilot',
+      'gemini-cli': 'Gemini CLI', 'cody': 'Cody', 'windsurf': 'Windsurf',
+      'kilo': 'Kilo', 'kilo-code': 'Kilo Code', 'qwen-code': 'Qwen Code',
+      'crush': 'Crush', 'goose': 'Goose', 'serena': 'Serena',
+      'python-openai': 'OpenAI SDK (Python)', 'node-openai': 'OpenAI SDK (Node)',
+      'unknown': 'Unknown'
+    };
+    function topClientLabel(u) {
+      if (!u || !u.top_client) return '-';
+      const c = u.top_client;
+      return (_adminClientLabels[c.client] || c.client) + ' (' + (c.requests || 0) + ')';
+    }
+    function topClientTooltip(u) {
+      if (!u || !u.clients || u.clients.length === 0) return 'No client data (last 30d)';
+      return u.clients.map(c => (_adminClientLabels[c.client] || c.client) + ': ' + (c.requests || 0)).join('\n');
+    }
+
     function renderRow(t, usageMap) {
       const adminBadge = t.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-user">User</span>';
       const shortToken = t.token.slice(0, 6);
@@ -905,6 +926,7 @@
     <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['7d']))}"><div class="uc-num">${req7d}</div>${miniStack(windowDetail(u['7d']))}</td>
     <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['30d']))}"><div class="uc-num">${req30d}</div>${miniStack(windowDetail(u['30d']))}</td>
     <td style="font-size:12px;color:#8b949e">${fmtDate(t.created_at)}</td>
+    <td style="font-size:11px;color:${u.top_client && u.top_client.client !== 'unknown' ? '#79c0ff' : '#8b949e'}" title="${esc(topClientTooltip(u))}">${esc(topClientLabel(u))}</td>
     <td>
       <button class="btn btn-sm" onclick="showEditModal('${esc(t.token)}')">Edit</button>
       <button class="btn btn-sm" onclick="openUsage('${esc(t.token)}')">Usage</button>
@@ -925,7 +947,7 @@
       const usageMap = usageRes.ok ? (usageRes.data.usage || {}) : {};
       const tbody = document.getElementById('token-tbody');
       if (!tokensRes.data.tokens || tokensRes.data.tokens.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="empty">No tokens</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="empty">No tokens</td></tr>';
       } else {
         tbody.innerHTML = tokensRes.data.tokens.map(t => renderRow(t, usageMap)).join('');
       }

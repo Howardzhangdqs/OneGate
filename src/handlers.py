@@ -11,11 +11,18 @@ from datetime import datetime, timedelta, timezone
 import aiohttp
 from aiohttp import web
 
+from src.client_detect import detect_client
 from src.config import AppConfig, match_provider
 from src.db import (
     check_rate_limit,
+    get_client_usage_detail,
+    get_global_client_hourly,
+    get_global_client_summary,
     get_provider_status,
+    get_token_client_usage_detail,
     get_token_usage_detail,
+    record_client_token_usage,
+    record_client_usage,
     record_status,
     record_success,
     record_token_usage,
@@ -178,6 +185,7 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
     }
 
     tokens_by_provider = get_token_usage_detail(db_conn, token, start_ts, end_ts)
+    clients_summary = get_token_client_usage_detail(db_conn, token, start_ts, end_ts)
 
     return {
         "token": token,
@@ -192,6 +200,7 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
         "summary": summary,
         "hourly": hourly,
         "tokens": tokens_by_provider,
+        "clients": clients_summary,
     }, None
 
 
@@ -268,6 +277,7 @@ def create_handlers(
         headers["X-Real-IP"] = public_ip
 
         forbidden = False
+        client = detect_client(request.headers)
         auth_header = request.headers.get("Authorization", "")
         if auth_header:
             proxy_token, resolved_auth = resolve_token(
@@ -490,6 +500,9 @@ def create_handlers(
                         )
                 if proxy_token:
                     record_usage(db_conn, proxy_token, effective_provider.name)
+                    record_client_usage(
+                        db_conn, proxy_token, effective_provider.name, client
+                    )
                     if resp.status == 200:
                         record_success(db_conn, proxy_token, effective_provider.name)
                         if tracker is not None:
@@ -509,6 +522,16 @@ def create_handlers(
                             db_conn,
                             proxy_token,
                             effective_provider.name,
+                            tin,
+                            tout,
+                            tcr,
+                            tcw,
+                        )
+                        record_client_token_usage(
+                            db_conn,
+                            proxy_token,
+                            effective_provider.name,
+                            client,
                             tin,
                             tout,
                             tcr,
@@ -681,10 +704,74 @@ def create_handlers(
             }
         )
 
+    async def serve_clients_page(request: web.Request) -> web.Response:
+        html_path = os.path.join(STATIC_DIR, "clients.html")
+        if not os.path.exists(html_path):
+            return web.json_response({"error": "clients.html not found"}, status=500)
+        with open(html_path, "r", encoding="utf-8") as f:
+            return web.Response(text=f.read(), content_type="text/html")
+
+    async def clients_api_handler(request: web.Request) -> web.Response:
+        now = datetime.now(timezone.utc)
+        start_str = request.query.get("start")
+        end_str = request.query.get("end")
+        if start_str:
+            start_dt = _parse_iso(start_str)
+        else:
+            start_dt = now - timedelta(hours=24)
+        if end_str:
+            end_dt = _parse_iso(end_str)
+        else:
+            end_dt = now
+        start_ts = int(start_dt.timestamp())
+        end_ts = int(end_dt.timestamp())
+
+        summary = get_global_client_summary(db_conn, start_ts, end_ts)
+        hourly = get_global_client_hourly(db_conn, start_ts, end_ts)
+        detail = get_client_usage_detail(db_conn, start_ts, end_ts)
+
+        start_hour = start_ts - (start_ts % 3600)
+        end_hour = end_ts - (end_ts % 3600)
+
+        timeseries: list[dict] = []
+        t = start_hour
+        while t <= end_hour:
+            dt = datetime.fromtimestamp(t, tz=timezone.utc)
+            key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            point: dict[str, int | str] = {"ts": key}
+            for client_name in hourly:
+                point[client_name] = hourly[client_name].get(t, 0)
+            timeseries.append(point)
+            t += 3600
+
+        total = sum(v["requests"] for v in summary.values())
+        unknown = summary.get("unknown", {}).get("requests", 0)
+        identified = total - unknown
+
+        return web.json_response(
+            {
+                "range": {
+                    "start": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "end": end_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                "total": total,
+                "identified": identified,
+                "unknown": unknown,
+                "recognition_rate": round(identified / total * 100, 2)
+                if total > 0
+                else None,
+                "summary": summary,
+                "detail": detail,
+                "timeseries": timeseries,
+            }
+        )
+
     return (
         serve_usage_page,
         info_api_handler,
         proxy_handler,
         serve_status_page,
         status_api_handler,
+        serve_clients_page,
+        clients_api_handler,
     )

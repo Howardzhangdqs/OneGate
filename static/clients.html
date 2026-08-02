@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Stats</title>
+  <link rel="stylesheet" href="/static/common.css">
+  <style>
+    .container {
+      max-width: 1100px
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px
+    }
+
+    .range-picker {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: #8b949e
+    }
+
+    .range-picker input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 13px
+    }
+
+    .range-picker input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr))
+    }
+
+    .summary-item .value {
+      font-size: 26px
+    }
+
+    .summary-item.identified .value {
+      color: #3fb950
+    }
+
+    .summary-item.unknown .value {
+      color: #d29922
+    }
+
+    .summary-item.rate .value {
+      color: #58a6ff
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px
+    }
+
+    @media (max-width: 820px) {
+      .main-grid {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .client-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #21262d
+    }
+
+    .client-row:last-child {
+      border-bottom: none
+    }
+
+    .client-name {
+      width: 150px;
+      font-size: 13px;
+      color: #c9d1d9;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    .client-name.unknown {
+      color: #d29922
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 22px;
+      background: #0d1117;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #1f6feb, #58a6ff);
+      border-radius: 4px;
+      transition: width .3s;
+      min-width: 2px
+    }
+
+    .bar-fill.unknown {
+      background: linear-gradient(90deg, #9e6a03, #d29922)
+    }
+
+    .client-count {
+      width: 80px;
+      text-align: right;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      color: #c9d1d9;
+      flex-shrink: 0
+    }
+
+    .client-meta {
+      width: 70px;
+      text-align: right;
+      font-size: 11px;
+      color: #8b949e;
+      flex-shrink: 0
+    }
+
+    .chart-wrap {
+      position: relative
+    }
+
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: #8b949e
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block
+    }
+
+    .chart-empty {
+      text-align: center;
+      padding: 60px 0;
+      color: #484f58;
+      font-size: 13px
+    }
+
+    .table-wrap {
+      overflow-x: auto
+    }
+
+    .table-wrap table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    .table-wrap th {
+      background: #21262d;
+      padding: 8px 12px;
+      text-align: right;
+      color: #8b949e;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      white-space: nowrap
+    }
+
+    .table-wrap th:first-child {
+      text-align: left
+    }
+
+    .table-wrap td {
+      padding: 6px 12px;
+      border-top: 1px solid #21262d;
+      font-size: 13px;
+      text-align: right;
+      font-variant-numeric: tabular-nums
+    }
+
+    .table-wrap td:first-child {
+      text-align: left
+    }
+
+    .num-in { color: #d29922 }
+    .num-out { color: #58a6ff }
+    .num-cr { color: #3fb950 }
+    .num-cw { color: #f85149 }
+    .pt-client { color: #79c0ff; font-weight: 600 }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      margin-right: 5px;
+      vertical-align: middle
+    }
+
+    .seg-in { background: #d29922 }
+    .seg-out { background: #58a6ff }
+    .seg-cr { background: #3fb950 }
+    .seg-cw { background: #f85149 }
+
+    .stack {
+      display: flex;
+      height: 16px;
+      min-width: 2px;
+      border-radius: 3px;
+      overflow: hidden
+    }
+
+    .seg {
+      height: 100%;
+      min-width: 0
+    }
+
+    .h-total td {
+      background: #161b22;
+      font-weight: 600;
+      border-top: 2px solid #30363d
+    }
+
+    .empty-row {
+      text-align: center;
+      padding: 30px;
+      color: #484f58;
+      font-size: 13px
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>Client Stats</h1>
+    <div class="range-picker">
+      <span>Range</span>
+      <input type="datetime-local" id="startInput">
+      <span>~</span>
+      <input type="datetime-local" id="endInput">
+      <button class="btn btn-sm" onclick="loadData()">Apply</button>
+      <button class="btn btn-sm" onclick="setRange(24)">24h</button>
+      <button class="btn btn-sm" onclick="setRange(168)">7d</button>
+      <button class="btn btn-sm" onclick="setRange(720)">30d</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h3>Overview</h3>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="value" id="totalReq">0</div>
+          <div class="label">Total Requests</div>
+        </div>
+        <div class="summary-item identified">
+          <div class="value" id="identifiedReq">0</div>
+          <div class="label">Identified</div>
+        </div>
+        <div class="summary-item unknown">
+          <div class="value" id="unknownReq">0</div>
+          <div class="label">Unknown</div>
+        </div>
+        <div class="summary-item rate">
+          <div class="value" id="recogRate">-</div>
+          <div class="label">Recognition Rate</div>
+        </div>
+        <div class="summary-item">
+          <div class="value" id="clientCount">0</div>
+          <div class="label">Distinct Clients</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <h3>By Client Tool</h3>
+        <div id="clientList">
+          <div class="chart-empty">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card chart-wrap">
+        <h3>Hourly Trend</h3>
+        <div class="chart-legend" id="chartLegend"></div>
+        <div id="trendChart">
+          <div class="chart-empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0">Token Usage by Client</h3>
+        <span style="font-size:12px;color:#8b949e">Requests, token usage & cache hit rate</span>
+      </div>
+      <div class="table-wrap">
+        <table id="usage-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Req</th>
+              <th><span class="dot seg-in"></span>In</th>
+              <th><span class="dot seg-out"></span>Out</th>
+              <th><span class="dot seg-cr"></span>Cache R</th>
+              <th><span class="dot seg-cw"></span>Cache W</th>
+              <th>命中率</th>
+              <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
+            </tr>
+          </thead>
+          <tbody id="usage-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PALETTE = [
+      '#58a6ff', '#3fb950', '#d29922', '#f85149', '#bc8cff',
+      '#39c5cf', '#ff7b72', '#ffa657', '#a5d6ff', '#7ee787',
+      '#e3b341', '#79c0ff', '#56d364', '#ff9bcf', '#b392f0'
+    ];
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
+    }
+
+    function fmtNum(n) {
+      return (n || 0).toLocaleString();
+    }
+
+    const labels = {
+      'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode',
+      'zcode': 'ZCode', 'cursor': 'Cursor', 'aider': 'Aider', 'cline': 'Cline',
+      'roo-code': 'Roo Code', 'continue': 'Continue', 'github-copilot': 'GitHub Copilot',
+      'gemini-cli': 'Gemini CLI', 'cody': 'Cody', 'windsurf': 'Windsurf',
+      'kilo': 'Kilo', 'kilo-code': 'Kilo Code', 'qwen-code': 'Qwen Code',
+      'crush': 'Crush', 'goose': 'Goose', 'serena': 'Serena',
+      'python-openai': 'OpenAI SDK (Python)', 'node-openai': 'OpenAI SDK (Node)',
+      'unknown': 'Unknown'
+    };
+
+    function label(name) {
+      return labels[name] || name;
+    }
+
+    function colorFor(name, i) {
+      if (name === 'unknown') return '#9e6a03';
+      return PALETTE[i % PALETTE.length];
+    }
+
+    function toLocalInputValue(date) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function setRange(hours) {
+      const end = new Date();
+      const start = new Date(end.getTime() - hours * 3600 * 1000);
+      document.getElementById('startInput').value = toLocalInputValue(start);
+      document.getElementById('endInput').value = toLocalInputValue(end);
+      loadData();
+    }
+
+    function toIso(value) {
+      if (!value) return '';
+      return new Date(value).toISOString().replace('.000', '');
+    }
+
+    async function loadData() {
+      const start = toIso(document.getElementById('startInput').value);
+      const end = toIso(document.getElementById('endInput').value);
+      let url = '/clients/api?';
+      if (start) url += 'start=' + encodeURIComponent(start) + '&';
+      if (end) url += 'end=' + encodeURIComponent(end);
+      try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        render(data);
+      } catch (e) {
+        document.getElementById('clientList').innerHTML = '<div class="chart-empty">Failed to load: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    function render(data) {
+      document.getElementById('totalReq').textContent = fmtNum(data.total);
+      document.getElementById('identifiedReq').textContent = fmtNum(data.identified);
+      document.getElementById('unknownReq').textContent = fmtNum(data.unknown);
+      document.getElementById('recogRate').textContent = data.recognition_rate == null ? '-' : data.recognition_rate + '%';
+
+      const summary = data.summary || {};
+      const entries = Object.entries(summary).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+      document.getElementById('clientCount').textContent = entries.length;
+
+      const maxReq = Math.max(1, ...entries.map(e => e[1].requests || 0));
+      const listEl = document.getElementById('clientList');
+      if (entries.length === 0) {
+        listEl.innerHTML = '<div class="chart-empty">No client data in this range</div>';
+      } else {
+        listEl.innerHTML = entries.map(([name, info], i) => {
+          const pct = ((info.requests || 0) / maxReq * 100).toFixed(1);
+          const isUnknown = name === 'unknown';
+          return `<div class="client-row">
+            <div class="client-name ${isUnknown ? 'unknown' : ''}" title="${esc(label(name))}">${esc(label(name))}</div>
+            <div class="bar-track"><div class="bar-fill ${isUnknown ? 'unknown' : ''}" style="width:${pct}%"></div></div>
+            <div class="client-count">${fmtNum(info.requests)}</div>
+            <div class="client-meta">${info.active_tokens || 0} tokens</div>
+          </div>`;
+        }).join('');
+      }
+
+      renderTrend(data.timeseries || [], entries);
+      renderUsageTable(data.detail || {});
+    }
+
+    function fmtT(n) {
+      n = Number(n) || 0;
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+      return String(n);
+    }
+
+    function tokSum(d) {
+      return (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_write || 0);
+    }
+
+    function hitRate(cacheRead, input) {
+      const denom = (cacheRead || 0) + (input || 0);
+      if (!denom) return null;
+      return (cacheRead || 0) / denom;
+    }
+
+    function hitRateCell(cacheRead, input) {
+      const r = hitRate(cacheRead, input);
+      if (r == null) return '<td>-</td>';
+      const pct = (r * 100).toFixed(1);
+      const cls = r >= 0.95 ? 'num-cr' : (r >= 0.8 ? 'num-in' : 'num-cw');
+      return `<td class="${cls}">${pct}%</td>`;
+    }
+
+    function stackSegs(d) {
+      const tot = tokSum(d);
+      if (!tot) return '';
+      const seg = (v, cls) => `<div class="seg ${cls}" style="width:${(v / tot * 100).toFixed(2)}%"></div>`;
+      return seg(d.cache_write, 'seg-cw') + seg(d.cache_read, 'seg-cr') + seg(d.output, 'seg-out') + seg(d.input, 'seg-in');
+    }
+
+    function renderUsageTable(detail) {
+      const tbody = document.getElementById('usage-body');
+      const clients = Object.entries(detail).sort((a, b) => tokSum(b[1]) - tokSum(a[1]));
+      if (clients.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No usage data in this range</td></tr>';
+        return;
+      }
+      const maxVal = Math.max(...clients.map(([, v]) => tokSum(v)), 1);
+      const num = v => v ? fmtT(v) : '-';
+      const cell = (v, cls) => `<td class="${cls || ''}">${num(v)}</td>`;
+      let totIn = 0, totOut = 0, totCR = 0, totCW = 0, totReq = 0;
+      const rows = clients.map(([name, t]) => {
+        totIn += t.input || 0; totOut += t.output || 0;
+        totCR += t.cache_read || 0; totCW += t.cache_write || 0;
+        totReq += t.requests || 0;
+        const d = { input: t.input || 0, output: t.output || 0, cache_read: t.cache_read || 0, cache_write: t.cache_write || 0 };
+        const stackW = Math.max(2, tokSum(d) / maxVal * 100).toFixed(1);
+        const isUnknown = name === 'unknown';
+        return `<tr><td class="pt-client" ${isUnknown ? 'style="color:#d29922"' : ''}>${esc(label(name))}</td>${cell(t.requests || 0)}${cell(t.input, 'num-in')}${cell(t.output, 'num-out')}${cell(t.cache_read, 'num-cr')}${cell(t.cache_write, 'num-cw')}${hitRateCell(t.cache_read, t.input)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(d)}</div></td></tr>`;
+      });
+      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      tbody.innerHTML = rows.join('');
+    }
+
+    function renderTrend(timeseries, entries) {
+      const chartEl = document.getElementById('trendChart');
+      const legendEl = document.getElementById('chartLegend');
+      if (timeseries.length === 0) {
+        chartEl.innerHTML = '<div class="chart-empty">No trend data</div>';
+        legendEl.innerHTML = '';
+        return;
+      }
+
+      const topClients = entries.slice(0, 8).map(e => e[0]);
+      const colors = {};
+      topClients.forEach((name, i) => { colors[name] = colorFor(name, i); });
+
+      legendEl.innerHTML = topClients.map(name =>
+        `<span class="legend-item"><span class="legend-dot" style="background:${colors[name]}"></span>${esc(label(name))}</span>`
+      ).join('');
+
+      const width = 520, height = 200, padL = 32, padB = 20, padT = 10, padR = 10;
+      const innerW = width - padL - padR;
+      const innerH = height - padT - padB;
+      const n = timeseries.length;
+
+      let maxVal = 0;
+      timeseries.forEach(pt => {
+        topClients.forEach(c => { maxVal = Math.max(maxVal, pt[c] || 0); });
+      });
+      maxVal = Math.max(1, maxVal);
+
+      const xStep = innerW / Math.max(1, n - 1);
+      const yScale = v => padT + innerH - (v / maxVal) * innerH;
+
+      let paths = '';
+      topClients.forEach(c => {
+        let d = '';
+        timeseries.forEach((pt, i) => {
+          const v = pt[c] || 0;
+          const x = padL + i * xStep;
+          const y = yScale(v);
+          d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+        });
+        paths += `<path d="${d}" fill="none" stroke="${colors[c]}" stroke-width="1.5" opacity="0.9"/>`;
+      });
+
+      const yTicks = [0, Math.ceil(maxVal / 2), maxVal];
+      let grid = '';
+      yTicks.forEach(v => {
+        const y = yScale(v);
+        grid += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#21262d" stroke-width="1"/>`;
+        grid += `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" fill="#484f58" font-size="10">${v}</text>`;
+      });
+
+      const xLabels = [0, Math.floor(n / 2), n - 1];
+      let xAxis = '';
+      xLabels.forEach(i => {
+        if (i >= timeseries.length) return;
+        const x = padL + i * xStep;
+        const dt = new Date(timeseries[i].ts);
+        const pad = nn => String(nn).padStart(2, '0');
+        const lbl = `${pad(dt.getMonth() + 1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:00`;
+        xAxis += `<text x="${x}" y="${height - 6}" text-anchor="middle" fill="#484f58" font-size="10">${lbl}</text>`;
+      });
+
+      chartEl.innerHTML = `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto">${grid}${paths}${xAxis}</svg>`;
+    }
+
+    setRange(168);
+  </script>
+</body>
+
+</html>

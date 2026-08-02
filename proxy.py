@@ -70,6 +70,8 @@ async def main():
         proxy_handler,
         serve_status_page,
         status_api_handler,
+        serve_clients_page,
+        clients_api_handler,
     ) = create_handlers(
         cfg, token_pool, db_conn, public_ip, session, time.time(), monitor
     )
@@ -110,6 +112,8 @@ async def main():
     app.router.add_get("/admin/api/tokens/usage", api_tokens_usage)
     app.router.add_get("/status", serve_status_page)
     app.router.add_get("/status/api", status_api_handler)
+    app.router.add_get("/clients", serve_clients_page)
+    app.router.add_get("/clients/api", clients_api_handler)
     app.router.add_get("/throughput", serve_tp_page)
     app.router.add_post("/throughput/api/session", create_tp_session)
     app.router.add_get("/throughput/events", tp_sse)
@@ -139,6 +143,7 @@ async def main():
     print(f"Token pool: {len(token_pool)} tokens")
     print(f"Usage query: http://0.0.0.0:{cfg.bind_port}/usage")
     print(f"Status page: http://0.0.0.0:{cfg.bind_port}/status")
+    print(f"Client stats: http://0.0.0.0:{cfg.bind_port}/clients")
     print(f"Admin panel: http://0.0.0.0:{cfg.bind_port}/admin")
     print(f"Model mapping: http://0.0.0.0:{cfg.bind_port}/mapping")
     print(f"Throughput: http://0.0.0.0:{cfg.bind_port}/throughput")

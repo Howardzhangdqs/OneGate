@@ -267,6 +267,32 @@ def init_db(
         ")"
     )
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS client_usage_log ("
+        "  token    TEXT NOT NULL,"
+        "  provider TEXT NOT NULL DEFAULT 'default',"
+        "  client   TEXT NOT NULL,"
+        "  ts       INTEGER NOT NULL,"
+        "  count    INTEGER NOT NULL DEFAULT 1,"
+        "  PRIMARY KEY (token, provider, client, ts)"
+        ")"
+    )
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS client_token_usage_log ("
+        "  token         TEXT NOT NULL,"
+        "  provider      TEXT NOT NULL DEFAULT 'default',"
+        "  client        TEXT NOT NULL,"
+        "  ts            INTEGER NOT NULL,"
+        "  input_tokens  INTEGER NOT NULL DEFAULT 0,"
+        "  output_tokens INTEGER NOT NULL DEFAULT 0,"
+        "  cache_read    INTEGER NOT NULL DEFAULT 0,"
+        "  cache_write   INTEGER NOT NULL DEFAULT 0,"
+        "  count         INTEGER NOT NULL DEFAULT 1,"
+        "  PRIMARY KEY (token, provider, client, ts)"
+        ")"
+    )
+
     generated_admins: list[str] = []
 
     has_any_admin = conn.execute(
@@ -334,6 +360,13 @@ def init_db(
     conn.execute(
         "DELETE FROM token_usage_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
     )
+    conn.execute(
+        "DELETE FROM client_usage_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
+    )
+    conn.execute(
+        "DELETE FROM client_token_usage_log WHERE ts < ?",
+        (int(time.time()) - 35 * 86400,),
+    )
     conn.commit()
 
     total = conn.execute("SELECT COUNT(*) FROM token_pool").fetchone()[0]
@@ -350,6 +383,237 @@ def record_usage(conn: sqlite3.Connection, token: str, provider_name: str):
         (token, provider_name, hour_ts),
     )
     conn.commit()
+
+
+def record_client_usage(
+    conn: sqlite3.Connection,
+    token: str,
+    provider_name: str,
+    client: str,
+):
+    if not client:
+        client = "unknown"
+    now = int(time.time())
+    hour_ts = now - (now % 3600)
+    conn.execute(
+        "INSERT INTO client_usage_log (token, provider, client, ts, count) "
+        "VALUES (?, ?, ?, ?, 1) "
+        "ON CONFLICT(token, provider, client, ts) DO UPDATE SET count = count + 1",
+        (token, provider_name, client, hour_ts),
+    )
+    conn.commit()
+
+
+def record_client_token_usage(
+    conn: sqlite3.Connection,
+    token: str,
+    provider_name: str,
+    client: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read: int = 0,
+    cache_write: int = 0,
+):
+    if not client:
+        client = "unknown"
+    if (
+        input_tokens <= 0
+        and output_tokens <= 0
+        and cache_read <= 0
+        and cache_write <= 0
+    ):
+        return
+    now = int(time.time())
+    hour_ts = now - (now % 3600)
+    conn.execute(
+        "INSERT INTO client_token_usage_log "
+        "(token, provider, client, ts, input_tokens, output_tokens, "
+        "cache_read, cache_write, count) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1) "
+        "ON CONFLICT(token, provider, client, ts) DO UPDATE SET "
+        "input_tokens = input_tokens + excluded.input_tokens, "
+        "output_tokens = output_tokens + excluded.output_tokens, "
+        "cache_read = cache_read + excluded.cache_read, "
+        "cache_write = cache_write + excluded.cache_write, "
+        "count = count + 1",
+        (
+            token,
+            provider_name,
+            client,
+            hour_ts,
+            max(0, input_tokens),
+            max(0, output_tokens),
+            max(0, cache_read),
+            max(0, cache_write),
+        ),
+    )
+    conn.commit()
+
+
+def get_client_usage_summary(
+    conn: sqlite3.Connection,
+    token: str,
+    start_ts: int,
+    end_ts: int,
+) -> dict[str, int]:
+    start_hour = start_ts - (start_ts % 3600)
+    end_hour = end_ts - (end_ts % 3600)
+    rows = conn.execute(
+        "SELECT client, SUM(count) FROM client_usage_log "
+        "WHERE token = ? AND ts >= ? AND ts < ? "
+        "GROUP BY client ORDER BY SUM(count) DESC",
+        (token, start_hour, end_hour + 3600),
+    ).fetchall()
+    return {client: (count or 0) for client, count in rows}
+
+
+def get_global_client_summary(
+    conn: sqlite3.Connection,
+    start_ts: int,
+    end_ts: int,
+) -> dict[str, dict]:
+    start_hour = start_ts - (start_ts % 3600)
+    end_hour = end_ts - (end_ts % 3600)
+    rows = conn.execute(
+        "SELECT client, SUM(count), COUNT(DISTINCT token) "
+        "FROM client_usage_log "
+        "WHERE ts >= ? AND ts < ? "
+        "GROUP BY client ORDER BY SUM(count) DESC",
+        (start_hour, end_hour + 3600),
+    ).fetchall()
+    result: dict[str, dict] = {}
+    for client, count, active_tokens in rows:
+        result[client] = {
+            "requests": count or 0,
+            "active_tokens": active_tokens or 0,
+        }
+    return result
+
+
+def get_global_client_hourly(
+    conn: sqlite3.Connection,
+    start_ts: int,
+    end_ts: int,
+) -> dict[str, dict[int, int]]:
+    start_hour = start_ts - (start_ts % 3600)
+    end_hour = end_ts - (end_ts % 3600)
+    rows = conn.execute(
+        "SELECT client, ts, SUM(count) FROM client_usage_log "
+        "WHERE ts >= ? AND ts < ? "
+        "GROUP BY client, ts ORDER BY client, ts",
+        (start_hour, end_hour + 3600),
+    ).fetchall()
+    by_client: dict[str, dict[int, int]] = {}
+    for client, ts, count in rows:
+        by_client.setdefault(client, {})[ts] = count or 0
+    return by_client
+
+
+def get_token_clients(
+    conn: sqlite3.Connection,
+    token: str,
+    days: int = 30,
+) -> list[dict]:
+    cutoff = int(time.time()) - days * 86400
+    cutoff_hour = cutoff - (cutoff % 3600)
+    rows = conn.execute(
+        "SELECT client, SUM(count) FROM client_usage_log "
+        "WHERE token = ? AND ts >= ? "
+        "GROUP BY client ORDER BY SUM(count) DESC",
+        (token, cutoff_hour),
+    ).fetchall()
+    return [{"client": client, "requests": count or 0} for client, count in rows]
+
+
+def get_client_usage_detail(
+    conn: sqlite3.Connection,
+    start_ts: int,
+    end_ts: int,
+) -> dict[str, dict[str, int]]:
+    start_hour = start_ts - (start_ts % 3600)
+    end_hour = end_ts - (end_ts % 3600)
+
+    req_rows = conn.execute(
+        "SELECT client, SUM(count) FROM client_usage_log "
+        "WHERE ts >= ? AND ts < ? GROUP BY client",
+        (start_hour, end_hour + 3600),
+    ).fetchall()
+
+    tok_rows = conn.execute(
+        "SELECT client, "
+        "SUM(input_tokens), SUM(output_tokens), "
+        "SUM(cache_read), SUM(cache_write), SUM(count) "
+        "FROM client_token_usage_log WHERE ts >= ? AND ts < ? "
+        "GROUP BY client",
+        (start_hour, end_hour + 3600),
+    ).fetchall()
+
+    result: dict[str, dict[str, int]] = {}
+    clients = {r[0] for r in req_rows} | {r[0] for r in tok_rows}
+    for client in clients:
+        result[client] = {
+            "requests": 0,
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+            "success_requests": 0,
+        }
+    for client, count in req_rows:
+        result[client]["requests"] = count or 0
+    for client, it, ot, cr, cw, sc in tok_rows:
+        result[client]["input"] = it or 0
+        result[client]["output"] = ot or 0
+        result[client]["cache_read"] = cr or 0
+        result[client]["cache_write"] = cw or 0
+        result[client]["success_requests"] = sc or 0
+    return result
+
+
+def get_token_client_usage_detail(
+    conn: sqlite3.Connection,
+    token: str,
+    start_ts: int,
+    end_ts: int,
+) -> dict[str, dict[str, int]]:
+    start_hour = start_ts - (start_ts % 3600)
+    end_hour = end_ts - (end_ts % 3600)
+
+    req_rows = conn.execute(
+        "SELECT client, SUM(count) FROM client_usage_log "
+        "WHERE token = ? AND ts >= ? AND ts < ? GROUP BY client",
+        (token, start_hour, end_hour + 3600),
+    ).fetchall()
+
+    tok_rows = conn.execute(
+        "SELECT client, "
+        "SUM(input_tokens), SUM(output_tokens), "
+        "SUM(cache_read), SUM(cache_write), SUM(count) "
+        "FROM client_token_usage_log WHERE token = ? AND ts >= ? AND ts < ? "
+        "GROUP BY client",
+        (token, start_hour, end_hour + 3600),
+    ).fetchall()
+
+    result: dict[str, dict[str, int]] = {}
+    clients = {r[0] for r in req_rows} | {r[0] for r in tok_rows}
+    for client in clients:
+        result[client] = {
+            "requests": 0,
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+            "success_requests": 0,
+        }
+    for client, count in req_rows:
+        result[client]["requests"] = count or 0
+    for client, it, ot, cr, cw, sc in tok_rows:
+        result[client]["input"] = it or 0
+        result[client]["output"] = ot or 0
+        result[client]["cache_read"] = cr or 0
+        result[client]["cache_write"] = cw or 0
+        result[client]["success_requests"] = sc or 0
+    return result
 
 
 def record_success(conn: sqlite3.Connection, token: str, provider_name: str):
