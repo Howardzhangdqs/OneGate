@@ -15,6 +15,11 @@ enable_log = false
 total = 1800
 connect = 30
 sock_read = 900
+# SSE stream guard: send `: ping` every stream_heartbeat seconds of upstream
+# silence and close the stream after stream_idle seconds of silence.
+# 0 disables either. Also settable via TIMEOUT_STREAM_HEARTBEAT / TIMEOUT_STREAM_IDLE.
+# stream_heartbeat = 10.0
+# stream_idle = 60.0
 
 [compression]
 # Whether to decompress response body before writing to log files.
