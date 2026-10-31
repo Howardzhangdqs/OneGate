@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Usage Query</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .container {
       max-width: 960px
@@ -28,7 +29,6 @@
       font-size: 12px;
       color: #8b949e;
       margin-bottom: 6px;
-      text-transform: uppercase;
       letter-spacing: .5px
     }
 
@@ -40,7 +40,7 @@
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 13px;
-      font-family: monospace
+      font-family: var(--font-all)
     }
 
     .form-group input:focus {
@@ -62,6 +62,59 @@
 
     .summary-item.current .value {
       color: #3fb950
+    }
+
+    .summary-item.cost .value {
+      color: #d29922
+    }
+
+    .limits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px
+    }
+
+    .limit-item .limit-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px
+    }
+
+    .limit-item .limit-label {
+      font-weight: 600;
+      font-size: 13px
+    }
+
+    .limit-item .limit-val {
+      font-size: 11px;
+      color: #8b949e;
+      font-variant-numeric: tabular-nums
+    }
+
+    .limit-bar {
+      height: 8px;
+      background: #21262d;
+      border-radius: 4px;
+      overflow: hidden
+    }
+
+    .limit-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .3s ease
+    }
+
+    .quota-reset {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums
+    }
+
+    .quota-reset b {
+      color: #c9d1d9;
+      font-weight: 600
     }
 
     .bar-cell {
@@ -216,6 +269,18 @@
       font-weight: 600
     }
 
+    .prov-tip .tip-section {
+      font-size: 11px;
+      color: #8b949e;
+      letter-spacing: .5px;
+      margin: 10px 0 6px;
+      font-weight: 600
+    }
+
+    .prov-tip .tip-section:first-child {
+      margin-top: 0
+    }
+
     .token-info {
       font-size: 12px;
       color: #8b949e;
@@ -227,7 +292,7 @@
       background: #0d1117;
       padding: 2px 6px;
       border-radius: 4px;
-      font-family: monospace;
+      font-family: var(--font-all);
       word-break: break-all
     }
 
@@ -259,7 +324,7 @@
       padding: 2px 4px 2px 8px;
       border-radius: 10px;
       cursor: pointer;
-      font-family: monospace;
+      font-family: var(--font-all);
       max-width: 280px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -288,21 +353,105 @@
       color: #f85149;
       background: rgba(248,81,73,.15)
     }
+
+    .live-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+      color: #8b949e;
+      white-space: nowrap
+    }
+
+    .live-switch {
+      position: relative;
+      width: 38px;
+      height: 20px;
+      background: #30363d;
+      border-radius: 10px;
+      transition: background .15s;
+      flex-shrink: 0
+    }
+
+    .live-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: #c9d1d9;
+      border-radius: 50%;
+      transition: transform .15s
+    }
+
+    .live-toggle.on .live-switch {
+      background: #238636
+    }
+
+    .live-toggle.on .live-switch::after {
+      transform: translateX(18px)
+    }
+
+    .live-toggle.on {
+      color: #3fb950
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #484f58
+    }
+
+    .live-dot.connecting {
+      background: #d29922;
+      animation: pulse-live 1s infinite
+    }
+
+    .live-dot.live {
+      background: #3fb950;
+      box-shadow: 0 0 6px #3fb95080
+    }
+
+    .live-dot.error {
+      background: #f85149
+    }
+
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1 }
+      50% { opacity: .3 }
+    }
+
+    .live-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap
+    }
   </style>
 </head>
 
 <body>
   <div class="prov-tip" id="prov-tip"></div>
-  <div class="header">
-    <h1>Usage Query</h1>
-  </div>
+  <div id="og-header"></div>
+  <script>
+    OneGateHeader.mount('#og-header', {
+      active: 'usage',
+      title: 'Usage Query'
+    });
+  </script>
   <div class="container">
     <div class="card">
       <h3>Query Parameters</h3>
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Token</label>
-          <input type="text" id="input-token" placeholder="enter your proxy token...">
+          <input type="text" id="input-token" placeholder="enter your proxy token... (empty = site-wide)">
           <div class="recent-tokens" id="recent-tokens"></div>
         </div>
         <div class="form-group">
@@ -316,6 +465,16 @@
         <button class="btn btn-primary" onclick="queryUsage()">Query</button>
       </div>
       <div id="error" class="error-msg" style="display:none"></div>
+      <div class="live-row">
+        <div class="live-toggle" id="live-toggle" onclick="toggleLive()">
+          <span class="live-switch"></span>
+          <span>Live</span>
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8b949e">
+          <span class="live-dot" id="live-dot"></span>
+          <span id="live-status">Live off</span>
+        </span>
+      </div>
     </div>
 
     <div id="results">
@@ -326,6 +485,22 @@
           <br>Providers: <span class="providers-tag" id="res-providers"></span>
         </div>
         <div class="summary-grid" id="summary-grid"></div>
+      </div>
+
+      <div class="card" id="quota-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Coding Plan Quota <span class="tag" id="quota-plan" style="display:none"></span></h3>
+          <span style="font-size:12px;color:#8b949e">上游 GLM Coding Plan · 缓存 60s</span>
+        </div>
+        <div class="limits-grid" id="quota-grid"></div>
+      </div>
+
+      <div class="card" id="limits-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Rate Limits</h3>
+          <span style="font-size:12px;color:#8b949e" id="limits-sub"></span>
+        </div>
+        <div class="limits-grid" id="limits-grid"></div>
       </div>
 
       <div class="card">
@@ -349,6 +524,30 @@
               </tr>
             </thead>
             <tbody id="tokens-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="models-card" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Cost by Model</h3>
+          <span style="font-size:12px;color:#8b949e" id="models-sub">Estimated · 元</span>
+        </div>
+        <div class="table-wrap">
+          <table id="models-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Req</th>
+                <th><span class="dot seg-in"></span>In</th>
+                <th><span class="dot seg-out"></span>Out</th>
+                <th><span class="dot seg-cr"></span>Cache R</th>
+                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>Cost (元)</th>
+                <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
+              </tr>
+            </thead>
+            <tbody id="models-body"></tbody>
           </table>
         </div>
       </div>
@@ -427,9 +626,9 @@
         localStorage.removeItem('_usage_token');
         try { var obj = JSON.parse(raw); inputToken.value = obj.t || raw; }
         catch (e) { inputToken.value = raw; }
-        queryUsage();
       }
       renderRecentTokens();
+      queryUsage();
     })();
 
     function saveRecentToken(token, desc) {
@@ -466,15 +665,12 @@
 
     async function queryUsage() {
       const token = inputToken.value.trim();
-      if (!token) {
-        showError('Please enter a token');
-        return;
-      }
       hideError();
       document.getElementById('results').style.display = 'none';
       document.getElementById('loading').style.display = 'block';
 
-      const body = { token };
+      const body = {};
+      if (token) body.token = token;
       if (inputStart.value) body.start = new Date(inputStart.value).toISOString();
       if (inputEnd.value) body.end = new Date(inputEnd.value).toISOString();
 
@@ -491,7 +687,13 @@
           return;
         }
         renderResults(data);
-        saveRecentToken(token, data.describe || '');
+        if (token) saveRecentToken(token, data.describe || '');
+        _usageData = data;
+        if (_liveAuto && token) {
+          connectLive();
+        } else if (!token && _liveOn) {
+          disconnectLive();
+        }
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
         showError('Network error: ' + e.message);
@@ -520,6 +722,14 @@
     }
 
     let _lastData = null;
+    let _usageData = null;
+    let _liveAuto = true;
+    let _liveOn = false;
+    let _liveToken = null;
+    let _liveStart = null;
+    let _liveEnd = null;
+    let _liveEventSource = null;
+    let _liveSid = null;
 
     document.getElementById('tz-name').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -535,9 +745,126 @@
       return esc(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`);
     }
 
+    function fmtReset(s) {
+      if (s == null) return 'never';
+      if (s <= 0) return 'now';
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.round(s / 60) + 'm';
+      if (s < 86400) return Math.round(s / 3600) + 'h';
+      return Math.round(s / 86400) + 'd';
+    }
+
+    function renderLimits(limits) {
+      const card = document.getElementById('limits-card');
+      const grid = document.getElementById('limits-grid');
+      const sub = document.getElementById('limits-sub');
+      if (!limits || !limits.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      sub.textContent = 'updated ' + new Date().toLocaleTimeString();
+      grid.innerHTML = limits.map(l => {
+        const pct = Math.max(0, Math.min(100, l.percent));
+        const over = l.percent > 100;
+        const barColor = over ? '#f85149' : (l.percent > 80 ? '#d29922' : '#58a6ff');
+        return '<div class="limit-item">' +
+          '<div class="limit-head"><span class="limit-label">' + esc(l.label) + '</span>' +
+          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + esc(l.unit) + ' (' + l.percent + '%) · reset ' + fmtReset(l.reset_in) + '</span></div>' +
+          '<div class="limit-bar"><div class="limit-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+          '</div>';
+      }).join('');
+    }
+
+    let _quotaData = null;
+
+    function quotaLabel(l) {
+      const prefix = { TOKENS_LIMIT: 'Token 用量', TIME_LIMIT: 'MCP/工具', CREDIT_LIMIT: '积分' }[l.type] || l.type || '-';
+      if (l.unit === 3 && l.number) return prefix + ' (' + l.number + '小时窗口)';
+      if (l.unit === 6) return prefix + ' (周)';
+      if (l.unit === 5) return prefix + ' (月度)';
+      if (l.unit === 1 && l.number) return prefix + ' (' + l.number + '分钟窗口)';
+      return prefix;
+    }
+
+    function quotaPct(l) {
+      if (l.percentage != null) return Math.max(0, Math.min(100, l.percentage));
+      if (l.usage > 0 && l.currentValue != null) return Math.max(0, Math.min(100, l.currentValue / l.usage * 100));
+      return null;
+    }
+
+    function quotaCountdown(diffMs) {
+      if (diffMs <= 0) return '已过期';
+      const s = Math.floor(diffMs / 1000);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor(s % 86400 / 3600);
+      const m = Math.floor(s % 3600 / 60);
+      const ss = s % 60;
+      if (d > 0) return d + '天' + h + '时' + m + '分后';
+      if (h > 0 || m > 0) return h + '时' + m + '分' + ss + '秒后';
+      return ss + '秒后';
+    }
+
+    function renderQuota() {
+      const card = document.getElementById('quota-card');
+      const data = _quotaData;
+      if (!data || !data.limits || !data.limits.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      const plan = data.level || data.planName;
+      const planEl = document.getElementById('quota-plan');
+      if (plan) { planEl.textContent = '套餐 ' + plan; planEl.style.display = ''; }
+      else { planEl.style.display = 'none'; }
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('quota-grid').innerHTML = data.limits.map(l => {
+        const pct = quotaPct(l);
+        let remTxt;
+        if (l.remaining != null && l.usage != null) {
+          const remPct = pct != null ? 100 - pct : null;
+          remTxt = '剩余 ' + l.remaining.toLocaleString() + ' / ' + l.usage.toLocaleString() +
+            (remPct != null ? ' (' + (Number.isInteger(remPct) ? remPct : remPct.toFixed(2)) + '%)' : '');
+        } else if (pct != null) {
+          const remPct = 100 - pct;
+          remTxt = '剩余 ' + (Number.isInteger(remPct) ? remPct : remPct.toFixed(2)) + '%';
+        } else {
+          remTxt = '剩余 -';
+        }
+        const barColor = pct == null ? '#9e6a03' : (pct >= 100 ? '#f85149' : (pct >= 80 ? '#d29922' : '#58a6ff'));
+        const barHtml = pct == null ? '' :
+          '<div class="limit-bar"><div class="limit-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
+        let resetHtml = '';
+        if (l.nextResetTime) {
+          const d = new Date(l.nextResetTime);
+          const abs = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+          resetHtml = '<div class="quota-reset">重置 <b class="quota-cd" data-reset="' + l.nextResetTime + '">' +
+            quotaCountdown(l.nextResetTime - Date.now()) + '</b> 后 · ' + abs + '</div>';
+        }
+        return '<div class="limit-item">' +
+          '<div class="limit-head"><span class="limit-label">' + esc(quotaLabel(l)) + '</span>' +
+          '<span class="limit-val">' + remTxt + '</span></div>' +
+          barHtml + resetHtml +
+          '</div>';
+      }).join('');
+    }
+
+    async function loadQuota() {
+      try {
+        const resp = await fetch('/usage/api/quota');
+        if (!resp.ok) { document.getElementById('quota-card').style.display = 'none'; return; }
+        const j = await resp.json();
+        if (!j.data || !j.data.limits) { document.getElementById('quota-card').style.display = 'none'; return; }
+        _quotaData = j.data;
+        renderQuota();
+      } catch (e) { }
+    }
+
+    setInterval(() => {
+      document.querySelectorAll('.quota-cd').forEach(el => {
+        el.textContent = quotaCountdown(Number(el.dataset.reset) - Date.now());
+      });
+    }, 1000);
+
+    setInterval(() => { if (document.visibilityState === 'visible') loadQuota(); }, 60000);
+
     function renderResults(data) {
       document.getElementById('results').style.display = 'block';
-      document.getElementById('res-token').textContent = data.token;
+      document.getElementById('res-token').textContent = data.token || '(全站所有 token)';
       const descEl = document.getElementById('res-describe');
       if (data.describe) {
         descEl.textContent = '(' + data.describe + ')';
@@ -553,13 +880,19 @@
         provsEl.innerHTML = data.providers.map(p => `<span class="tag">${esc(p)}</span>`).join('');
       }
 
-      const summaryHtml = [
+      const summaryItems = [
         { label: 'Range Total', value: data.total, cls: '' },
         { label: 'Last 24h', value: data.summary.last_24h, cls: 'current' },
         { label: 'Last 7d', value: data.summary.last_7d, cls: '' },
         { label: 'Last 30d', value: data.summary.last_30d, cls: '' },
-      ].map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
+      ];
+      if (data.total_cost != null) {
+        summaryItems.push({ label: 'Est. Cost (元)', value: fmtCost(data.total_cost), cls: 'cost' });
+      }
+      const summaryHtml = summaryItems.map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
       document.getElementById('summary-grid').innerHTML = summaryHtml;
+
+      renderLimits(data.limits || []);
 
       const providerNames = Object.keys(data.current_hour.by_provider || {});
       if (providerNames.length === 0 && data.total === 0) {
@@ -570,11 +903,222 @@
       Object.values(data.hourly).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
       const allProv = [...allProvSet].sort();
 
-      _lastData = { hourly: data.hourly, allProv };
-      renderHourly({ hourly: data.hourly, allProv });
+      const allClientSet = new Set();
+      Object.values(data.hourly_by_client || {}).forEach(h => Object.keys(h).forEach(c => allClientSet.add(c)));
+      const allClients = [...allClientSet].sort();
+
+      _lastData = { hourly: data.hourly, allProv, hourly_by_client: data.hourly_by_client || {}, allClients };
+      renderHourly({ hourly: data.hourly, allProv, hourly_by_client: data.hourly_by_client || {}, allClients });
       renderTokens(data.tokens || {});
       renderClients(data.clients || {});
+      fetchPricing().then(() => renderModels(data.models || {}));
     }
+
+    function setLiveStatus(cls, text) {
+      const dot = document.getElementById('live-dot');
+      dot.className = 'live-dot' + (cls ? ' ' + cls : '');
+      document.getElementById('live-status').textContent = text;
+    }
+
+    function setLiveToggle(on) {
+      _liveOn = on;
+      const el = document.getElementById('live-toggle');
+      if (on) el.classList.add('on'); else el.classList.remove('on');
+    }
+
+    function toggleLive() {
+      if (_liveOn) {
+        disconnectLive();
+      } else {
+        if (!_usageData) {
+          setLiveStatus('error', 'Query a token first');
+          setTimeout(() => { if (!_liveOn) setLiveStatus('', 'Live off'); }, 1800);
+          return;
+        }
+        if (!inputToken.value.trim()) {
+          setLiveStatus('error', 'Live needs a specific token');
+          setTimeout(() => { if (!_liveOn) setLiveStatus('', 'Live off'); }, 1800);
+          return;
+        }
+        connectLive();
+      }
+    }
+
+    async function connectLive() {
+      disconnectLive(true);
+      const token = inputToken.value.trim();
+      if (!token) { setLiveStatus('error', 'No token'); return; }
+      const body = { token };
+      if (inputStart.value) body.start = new Date(inputStart.value).toISOString();
+      if (inputEnd.value) body.end = new Date(inputEnd.value).toISOString();
+      _liveToken = token;
+      _liveStart = body.start || null;
+      _liveEnd = body.end || null;
+      setLiveToggle(true);
+      setLiveStatus('connecting', 'Connecting...');
+      try {
+        const resp = await fetch('/usage/api/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          setLiveToggle(false);
+          setLiveStatus('error', data.error || 'Failed');
+          return;
+        }
+        _liveSid = data.session_id;
+        openLiveEventSource();
+      } catch (e) {
+        setLiveToggle(false);
+        setLiveStatus('error', 'Network error');
+      }
+    }
+
+    function openLiveEventSource() {
+      _liveEventSource = new EventSource('/usage/events?sid=' + encodeURIComponent(_liveSid));
+
+      _liveEventSource.addEventListener('snapshot', e => {
+        try {
+          const data = JSON.parse(e.data);
+          _usageData = data;
+          renderResults(data);
+          setLiveStatus('live', 'Live');
+        } catch (err) { }
+      });
+
+      _liveEventSource.addEventListener('error', e => {
+        try {
+          if (e.data) {
+            const obj = JSON.parse(e.data);
+            setLiveStatus('error', obj.error || 'Snapshot error');
+          }
+        } catch (err) { }
+      });
+
+      _liveEventSource.addEventListener('connected', () => {
+        setLiveStatus('live', 'Live');
+      });
+
+      _liveEventSource.addEventListener('delta', e => {
+        try {
+          const d = JSON.parse(e.data);
+          applyDelta(d);
+        } catch (err) { }
+      });
+
+      _liveEventSource.onerror = () => {
+        if (!_liveOn) return;
+        if (_liveEventSource) { _liveEventSource.close(); _liveEventSource = null; }
+        setLiveStatus('connecting', 'Reconnecting...');
+        setTimeout(() => { if (_liveOn) connectLive(); }, 1500);
+      };
+    }
+
+    function disconnectLive(silent) {
+      if (_liveEventSource) {
+        _liveEventSource.close();
+        _liveEventSource = null;
+      }
+      _liveSid = null;
+      setLiveToggle(false);
+      if (!silent) setLiveStatus('', 'Live off');
+    }
+
+    function applyDelta(d) {
+      if (!_usageData) return;
+      const startTs = _usageData.range ? new Date(_usageData.range.start).getTime() / 1000 : null;
+      const endTs = (_liveEnd || (_usageData.range && _usageData.range.end))
+        ? new Date(_liveEnd || _usageData.range.end).getTime() / 1000 : null;
+      const inRange = endTs == null || d.ts <= endTs;
+      if (!inRange) return;
+
+      _usageData.total = (_usageData.total || 0) + (d.requests || 0);
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (d.ts >= nowSec - 24 * 3600) _usageData.summary.last_24h = (_usageData.summary.last_24h || 0) + (d.requests || 0);
+      if (d.ts >= nowSec - 7 * 24 * 3600) _usageData.summary.last_7d = (_usageData.summary.last_7d || 0) + (d.requests || 0);
+      if (d.ts >= nowSec - 30 * 24 * 3600) _usageData.summary.last_30d = (_usageData.summary.last_30d || 0) + (d.requests || 0);
+
+      const hourKey = d.hour;
+      const curHour = _usageData.current_hour;
+      if (curHour && hourKey === curHour.hour) {
+        curHour.by_provider[d.provider] = (curHour.by_provider[d.provider] || 0) + (d.requests || 0);
+      }
+
+      if (!_usageData.hourly[hourKey]) _usageData.hourly[hourKey] = {};
+      const hSlot = _usageData.hourly[hourKey];
+      if (!hSlot[d.provider]) hSlot[d.provider] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
+      _addSlot(hSlot[d.provider], d);
+
+      if (!_usageData.hourly_by_client) _usageData.hourly_by_client = {};
+      if (!_usageData.hourly_by_client[hourKey]) _usageData.hourly_by_client[hourKey] = {};
+      const hcSlot = _usageData.hourly_by_client[hourKey];
+      if (!hcSlot[d.client]) hcSlot[d.client] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
+      _addSlot(hcSlot[d.client], d);
+
+      if (!_usageData.tokens) _usageData.tokens = {};
+      if (!_usageData.tokens[d.provider]) _usageData.tokens[d.provider] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
+      _addSlot(_usageData.tokens[d.provider], d);
+
+      if (!_usageData.clients) _usageData.clients = {};
+      if (!_usageData.clients[d.client]) _usageData.clients[d.client] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
+      _addSlot(_usageData.clients[d.client], d);
+
+      if (!_usageData.models) _usageData.models = {};
+      const modelName = d.model || '';
+      if (!_usageData.models[modelName]) _usageData.models[modelName] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
+      _addSlot(_usageData.models[modelName], d);
+
+      rerenderAll();
+    }
+
+    function _addSlot(slot, d) {
+      slot.input += d.input || 0;
+      slot.output += d.output || 0;
+      slot.cache_read += d.cache_read || 0;
+      slot.cache_write += d.cache_write || 0;
+      slot.requests += d.requests || 0;
+    }
+
+    function rerenderAll() {
+      if (!_usageData) return;
+      const summaryItems = [
+        { label: 'Range Total', value: _usageData.total, cls: '' },
+        { label: 'Last 24h', value: _usageData.summary.last_24h, cls: 'current' },
+        { label: 'Last 7d', value: _usageData.summary.last_7d, cls: '' },
+        { label: 'Last 30d', value: _usageData.summary.last_30d, cls: '' },
+      ];
+      if (_pricingMap && _usageData.models) {
+        let tc = 0, has = false;
+        for (const m in _usageData.models) {
+          const p = _pricingMap[m];
+          if (p) { tc += computeCost(_usageData.models[m], p); has = true; }
+        }
+        if (has) summaryItems.push({ label: 'Est. Cost (元)', value: fmtCost(tc), cls: 'cost' });
+      }
+      const summaryHtml = summaryItems.map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
+      document.getElementById('summary-grid').innerHTML = summaryHtml;
+
+      const providerNames = Object.keys(_usageData.current_hour.by_provider || {});
+      const allProvSet = new Set(providerNames);
+      Object.values(_usageData.hourly).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
+      const allProv = [...allProvSet].sort();
+
+      const allClientSet = new Set();
+      Object.values(_usageData.hourly_by_client || {}).forEach(h => Object.keys(h).forEach(c => allClientSet.add(c)));
+      const allClients = [...allClientSet].sort();
+
+      _lastData = { hourly: _usageData.hourly, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients };
+      renderHourly({ hourly: _usageData.hourly, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients });
+      renderTokens(_usageData.tokens || {});
+      renderClients(_usageData.clients || {});
+      renderModels(_usageData.models || {});
+    }
+
+    window.addEventListener('beforeunload', () => { if (_liveEventSource) _liveEventSource.close(); });
+
+    loadQuota();
 
     function fmtNum(n) {
       n = Number(n) || 0;
@@ -594,6 +1138,78 @@
       'unknown': 'Unknown'
     };
     function clientLabel(n) { return _clientLabels[n] || n; }
+
+    let _pricingMap = null;
+    async function fetchPricing() {
+      if (_pricingMap) return _pricingMap;
+      try {
+        const resp = await fetch('/pricing/api');
+        const data = await resp.json();
+        _pricingMap = {};
+        for (const p of (data.pricing || [])) {
+          _pricingMap[p.model] = p;
+        }
+      } catch (e) { _pricingMap = {}; }
+      return _pricingMap;
+    }
+
+    function computeCost(d, price) {
+      if (!price) return null;
+      const inputMiss = d.input || 0;
+      const inputHit = d.cache_read || 0;
+      const outputMiss = Math.max(0, (d.output || 0) - (d.cache_write || 0));
+      const outputHit = d.cache_write || 0;
+      const total = inputMiss * (price.input_cache_miss || 0)
+        + inputHit * (price.input_cache_hit || 0)
+        + outputMiss * (price.output_cache_miss || 0)
+        + outputHit * (price.output_cache_hit || 0);
+      return total / 1e6;
+    }
+
+    function fmtCost(v) {
+      if (v == null) return '-';
+      const n = Number(v);
+      if (n === 0) return '0';
+      if (n < 0.01) return n.toFixed(6);
+      if (n < 1) return n.toFixed(4);
+      return n.toFixed(2);
+    }
+
+    function renderModels(modelsMap) {
+      const card = document.getElementById('models-card');
+      const sub = document.getElementById('models-sub');
+      const entries = Object.entries(modelsMap || {}).filter(([m, d]) =>
+        (d.input || 0) || (d.output || 0) || (d.cache_read || 0) || (d.cache_write || 0) || (d.requests || 0));
+      const pricedEntries = entries.filter(([m]) => _pricingMap && _pricingMap[m]);
+      if (entries.length === 0) { card.style.display = 'none'; return; }
+      card.style.display = '';
+
+      const tbody = document.getElementById('models-body');
+      const maxVal = Math.max(...entries.map(([, d]) =>
+        (d.input || 0) + (d.output || 0) + (d.cache_read || 0) + (d.cache_write || 0)), 1);
+      const num = v => v ? fmtNum(v) : '-';
+      const cell = (v, cls) => `<td class="${cls || ''}">${num(v)}</td>`;
+      let totIn = 0, totOut = 0, totCR = 0, totCW = 0, totReq = 0, totCost = 0;
+      let hasCost = false;
+      const rows = entries.sort((a, b) => tokSum(b[1]) - tokSum(a[1])).map(([name, d]) => {
+        totIn += d.input || 0; totOut += d.output || 0;
+        totCR += d.cache_read || 0; totCW += d.cache_write || 0;
+        totReq += d.requests || 0;
+        const price = _pricingMap && _pricingMap[name];
+        const cost = price ? computeCost(d, price) : null;
+        if (cost != null) { totCost += cost; hasCost = true; }
+        const dd = { input: d.input || 0, output: d.output || 0, cache_read: d.cache_read || 0, cache_write: d.cache_write || 0 };
+        const stackW = Math.max(2, tokSum(dd) / maxVal * 100).toFixed(1);
+        const nameDisp = name === '' ? '<span style="color:#8b949e">(unknown)</span>' : esc(name);
+        const costCls = price ? 'num-cr' : '';
+        return `<tr><td class="pt-prov">${nameDisp}</td>${cell(d.requests || 0)}${cell(d.input, 'num-in')}${cell(d.output, 'num-out')}${cell(d.cache_read, 'num-cr')}${cell(d.cache_write, 'num-cw')}<td class="${costCls}">${fmtCost(cost)}</td><td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(dd)}</div></td></tr>`;
+      });
+      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}<td class="num-cr">${hasCost ? fmtCost(totCost) : '-'}</td><td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      tbody.innerHTML = rows.join('');
+      sub.textContent = hasCost
+        ? `Estimated · total ${fmtCost(totCost)} 元`
+        : 'Estimated · 元';
+    }
 
     function renderClients(clientsDetail) {
       const tableEl = document.getElementById('clients-table');
@@ -687,9 +1303,11 @@
     }
 
 
-    function renderHourly({ hourly, allProv }) {
+    function renderHourly({ hourly, allProv, hourly_by_client, allClients }) {
       const tbody = document.getElementById('hourly-body');
       const entries = Object.entries(hourly).reverse();
+      const hbc = hourly_by_client || {};
+      const aClients = allClients || [];
 
       if (entries.length === 0) {
         tbody.innerHTML = '';
@@ -707,7 +1325,12 @@
           dReq += d.requests || 0;
           return { p, d };
         });
-        return { hour, provDetails, dIn, dOut, dCR, dCW, dReq };
+        const clientCounts = hbc[hour] || {};
+        const clientDetails = aClients.map(c => {
+          const d = clientCounts[c] || {};
+          return { c, d };
+        });
+        return { hour, provDetails, clientDetails, dIn, dOut, dCR, dCW, dReq };
       });
 
       const maxVal = Math.max(...dataRows.map(r => r.dIn + r.dOut + r.dCR + r.dCW), 1);
@@ -717,11 +1340,33 @@
       const html = [];
       dataRows.forEach(r => {
         const provs = r.provDetails.filter(pd => tokSum(pd.d) > 0 || (pd.d.requests || 0) > 0);
-        const tip = provs.length > 0 ? escAttr(provTipHtml(provs)) : '';
+        const clients = r.clientDetails.filter(cd => tokSum(cd.d) > 0 || (cd.d.requests || 0) > 0);
+        let tip = '';
+        if (provs.length > 0) {
+          tip += '<div class="tip-section">By Provider</div>' + provTipHtml(provs);
+        }
+        if (clients.length > 0) {
+          tip += '<div class="tip-section">By Client</div>' + clientTipHtml(clients);
+        }
         const stackW = Math.max(2, (r.dIn + r.dOut + r.dCR + r.dCW) / maxVal * 100).toFixed(1);
-        html.push(`<tr class="h-row" data-provs="${tip}"><td class="h-hour">${fmtHour(r.hour)}</td>${cell(r.dReq)}${cell(r.dIn, 'num-in')}${cell(r.dOut, 'num-out')}${cell(r.dCR, 'num-cr')}${cell(r.dCW, 'num-cw')}${hitRateCell(r.dCR, r.dIn)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs({ input: r.dIn, output: r.dOut, cache_read: r.dCR, cache_write: r.dCW })}</div></td></tr>`);
+        html.push(`<tr class="h-row" data-provs="${escAttr(tip)}"><td class="h-hour">${fmtHour(r.hour)}</td>${cell(r.dReq)}${cell(r.dIn, 'num-in')}${cell(r.dOut, 'num-out')}${cell(r.dCR, 'num-cr')}${cell(r.dCW, 'num-cw')}${hitRateCell(r.dCR, r.dIn)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs({ input: r.dIn, output: r.dOut, cache_read: r.dCR, cache_write: r.dCW })}</div></td></tr>`);
       });
       tbody.innerHTML = html.join('');
+    }
+
+    function clientTipHtml(clients) {
+      const head = '<thead><tr><th>Client</th><th>Req</th><th>In</th><th>Out</th><th>Cache R</th><th>Cache W</th><th>命中率</th></tr></thead>';
+      let tIn = 0, tOut = 0, tCR = 0, tCW = 0, tReq = 0;
+      const rows = clients.map(({ c, d }) => {
+        tIn += d.input || 0; tOut += d.output || 0;
+        tCR += d.cache_read || 0; tCW += d.cache_write || 0;
+        tReq += d.requests || 0;
+        const isUnknown = c === 'unknown';
+        const cc = (v, cls) => `<td class="${cls}">${fmtNum(v)}</td>`;
+        return `<tr><td class="pt-prov" ${isUnknown ? 'style="color:#d29922"' : ''}>${esc(clientLabel(c))}</td>${cc(d.requests || 0)}${cc(d.input || 0, 'pt-in')}${cc(d.output || 0, 'pt-out')}${cc(d.cache_read || 0, 'pt-cr')}${cc(d.cache_write || 0, 'pt-cw')}${ptHitRateCell(d.cache_read, d.input)}</tr>`;
+      });
+      rows.push(`<tr class="pt-total"><td>Total</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
+      return '<table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
     }
 
     function ptHitRateCell(cr, inp) {

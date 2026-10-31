@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Service Status</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .provider-name {
       font-size: 16px;
@@ -107,7 +108,6 @@
     .timeline-section h4 {
       font-size: 12px;
       color: #8b949e;
-      text-transform: uppercase;
       letter-spacing: .5px;
       margin-bottom: 8px
     }
@@ -188,7 +188,6 @@
     .error-section h4 {
       font-size: 12px;
       color: #8b949e;
-      text-transform: uppercase;
       letter-spacing: .5px;
       margin-bottom: 6px
     }
@@ -205,7 +204,7 @@
       border-radius: 4px;
       font-size: 11px;
       font-weight: 600;
-      font-family: monospace
+      font-family: var(--font-all)
     }
 
     .status-2xx {
@@ -248,24 +247,139 @@
       padding: 2px 0 0;
       margin-top: -2px
     }
+
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d1117;
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.hidden {
+      display: none
+    }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 420px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 8px
+    }
+
+    .login-box .subtitle {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group {
+      margin-bottom: 16px
+    }
+
+    .login-box .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      letter-spacing: .5px
+    }
+
+    .login-box .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      border-radius: 6px;
+      font-family: var(--font-all)
+    }
+
+    .login-box .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input {
+      accent-color: #238636
+    }
+
+    .status-content {
+      display: none
+    }
+
+    .status-content.active {
+      display: block
+    }
   </style>
 </head>
 
 <body>
-  <div class="header">
-    <h1>Service Status</h1>
-    <div style="display:flex;align-items:center;gap:16px">
-      <div class="uptime-display">Uptime: <span id="uptime">-</span></div>
-      <button class="btn btn-sm" onclick="loadStatus()">Refresh</button>
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Service Status</h2>
+      <div class="subtitle">Enter your proxy token to view the status of the providers available to you</div>
+      <div class="form-group">
+        <label>Proxy Token</label>
+        <input type="text" id="login-token" placeholder="enter your proxy token..." autofocus>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">View Status</button>
+      <div class="error-msg" id="login-error"></div>
     </div>
   </div>
-  <div class="container" id="content">
-    <div class="loading">Loading...</div>
+
+  <div class="status-content" id="status-content">
+    <div id="og-header"></div>
+    <script>
+      OneGateHeader.mount('#og-header', {
+        active: 'status',
+        title: 'Service Status',
+        actions: '<div class="uptime-display">Uptime: <span id="uptime">-</span></div><button class="btn btn-sm" onclick="loadStatus()">Refresh</button><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+      });
+    </script>
+    <div class="container" id="content">
+      <div class="loading">Loading...</div>
+    </div>
   </div>
 
   <div class="tooltip" id="tooltip"></div>
 
   <script>
+    const STATUS_TOKEN_KEY = 'status_token';
+    let proxyToken = null;
+
     function esc(s) {
       const d = document.createElement('div');
       d.textContent = s;
@@ -472,35 +586,113 @@
       </div>`;
     }
 
-    async function loadStatus() {
+    function renderStatus(data) {
+      const uptimeEl = document.getElementById('uptime');
+      if (uptimeEl) uptimeEl.textContent = formatUptime(data.uptime);
+
+      window._statusData = data.stats || {};
+
+      const content = document.getElementById('content');
+      if (!data.providers || data.providers.length === 0) {
+        content.innerHTML = '<div class="no-data">No providers available for this token</div>';
+        return;
+      }
+      const providerOrder = [...data.providers].sort((a, b) => {
+        const ta = ((data.summary || {})[a.name] || {})['24h'] || {};
+        const tb = ((data.summary || {})[b.name] || {})['24h'] || {};
+        return (tb.total || 0) - (ta.total || 0);
+      });
+      content.innerHTML = providerOrder.map(p => {
+        const hourly = (data.stats || {})[p.name] || [];
+        const summary = (data.summary || {})[p.name] || null;
+        return renderProvider(p, hourly, summary);
+      }).join('');
+    }
+
+    function showLogin(message) {
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('status-content').classList.remove('active');
+      document.getElementById('login-error').textContent = message || '';
+    }
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      const errorEl = document.getElementById('login-error');
+      if (!token) {
+        errorEl.textContent = 'Please enter your proxy token';
+        return;
+      }
+      errorEl.textContent = '';
       try {
-        const resp = await fetch('/status/api');
-        const data = await resp.json();
-        document.getElementById('uptime').textContent = formatUptime(data.uptime);
-
-        window._statusData = data.stats || {};
-
-        const content = document.getElementById('content');
-        if (!data.providers || data.providers.length === 0) {
-          content.innerHTML = '<div class="no-data">No providers configured</div>';
+        const resp = await fetch('/status/api', { headers: { 'X-Proxy-Token': token } });
+        if (resp.status === 401 || resp.status === 403) {
+          let data = {};
+          try { data = await resp.json(); } catch (e) { data = {}; }
+          errorEl.textContent = data.error || 'Invalid token';
           return;
         }
-        const providerOrder = [...data.providers].sort((a, b) => {
-          const ta = ((data.summary || {})[a.name] || {})['24h'] || {};
-          const tb = ((data.summary || {})[b.name] || {})['24h'] || {};
-          return (tb.total || 0) - (ta.total || 0);
-        });
-        content.innerHTML = providerOrder.map(p => {
-          const hourly = (data.stats || {})[p.name] || [];
-          const summary = (data.summary || {})[p.name] || null;
-          return renderProvider(p, hourly, summary);
-        }).join('');
+        if (!resp.ok) {
+          errorEl.textContent = 'Login failed';
+          return;
+        }
+        const data = await resp.json();
+        proxyToken = token;
+        if (document.getElementById('login-remember').checked) {
+          localStorage.setItem(STATUS_TOKEN_KEY, token);
+        } else {
+          localStorage.removeItem(STATUS_TOKEN_KEY);
+        }
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('status-content').classList.add('active');
+        renderStatus(data);
+      } catch (e) {
+        errorEl.textContent = 'Network error';
+      }
+    }
+
+    function doLogout() {
+      proxyToken = null;
+      window._statusData = {};
+      localStorage.removeItem(STATUS_TOKEN_KEY);
+      document.getElementById('uptime').textContent = '-';
+      document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+      showLogin('');
+      document.getElementById('login-token').value = '';
+    }
+
+    async function loadStatus() {
+      if (!proxyToken) return;
+      try {
+        const resp = await fetch('/status/api', { headers: { 'X-Proxy-Token': proxyToken } });
+        if (resp.status === 401 || resp.status === 403) {
+          let data = {};
+          try { data = await resp.json(); } catch (e) { data = {}; }
+          proxyToken = null;
+          localStorage.removeItem(STATUS_TOKEN_KEY);
+          showLogin(data.error || 'Invalid or disabled token');
+          return;
+        }
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        renderStatus(data);
       } catch (e) {
         document.getElementById('content').innerHTML = `<div class="error-msg">Failed to load status: ${esc(e.message)}</div>`;
       }
     }
 
-    loadStatus();
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    (function autoLogin() {
+      const saved = localStorage.getItem(STATUS_TOKEN_KEY);
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        doLogin();
+      }
+    })();
+
     setInterval(loadStatus, 600000);
   </script>
 </body>

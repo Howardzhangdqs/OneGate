@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Token Management</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .table-wrap {
       overflow-x: auto;
@@ -45,7 +46,7 @@
 
     .token-cell {
       text-align: left;
-      font-family: monospace;
+      font-family: var(--font-all);
       font-size: 12px;
       word-break: break-all;
       color: #79c0ff;
@@ -58,7 +59,7 @@
       background: #1c2128;
       border: 1px solid #30363d;
       color: #79c0ff;
-      font-family: monospace;
+      font-family: var(--font-all);
       font-size: 12px;
       padding: 6px 10px;
       border-radius: 6px;
@@ -95,7 +96,6 @@
       font-size: 11px;
       color: #8b949e;
       margin-bottom: 8px;
-      text-transform: uppercase;
       letter-spacing: .5px
     }
 
@@ -175,20 +175,40 @@
       padding: 6px 14px
     }
 
+    .limits-cell {
+      cursor: help;
+      padding: 6px 14px
+    }
+
+    .rl-pill {
+      display: inline-block;
+      background: rgba(31, 111, 235, .15);
+      color: #58a6ff;
+      border: 1px solid rgba(31, 111, 235, .4);
+      padding: 1px 9px;
+      border-radius: 10px;
+      font-size: 11px;
+      white-space: nowrap
+    }
+
     .usage-cell .uc-num {
       font-size: 12px;
       color: #c9d1d9;
       line-height: 1.3
     }
 
+    .usage-cell .uc-num .tk-in { color: #d29922 }
+    .usage-cell .uc-num .tk-out { color: #58a6ff }
+    .usage-cell .uc-num .tk-cr { color: #3fb950 }
+
     .mini-stack {
       display: flex;
-      width: 52px;
+      width: 100%;
       height: 4px;
       border-radius: 2px;
       overflow: hidden;
       background: #21262d;
-      margin: 2px auto 0
+      margin: 2px 0 0
     }
 
     .mini-stack .seg {
@@ -341,7 +361,9 @@
       border-radius: 12px;
       padding: 24px;
       width: 420px;
-      max-width: 90vw
+      max-width: 90vw;
+      max-height: 92vh;
+      overflow-y: auto
     }
 
     .modal h3 {
@@ -359,7 +381,6 @@
       font-size: 12px;
       color: #8b949e;
       margin-bottom: 6px;
-      text-transform: uppercase;
       letter-spacing: .5px
     }
 
@@ -371,7 +392,24 @@
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 13px;
-      font-family: monospace
+      font-family: var(--font-all)
+    }
+
+    .rl-input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 13px
+    }
+
+    .rl-label {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 2px;
+      display: block
     }
 
     .checkbox-group {
@@ -400,6 +438,34 @@
 
     .checkbox-group input[type=checkbox] {
       accent-color: #238636
+    }
+
+    .checkbox-group.scroll {
+      max-height: 160px;
+      overflow-y: auto;
+      padding: 2px
+    }
+
+    .form-hint {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 6px;
+      line-height: 1.5
+    }
+
+    a.btn {
+      text-decoration: none
+    }
+
+    .models-cell {
+      display: inline-block;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+      font-size: 11px;
+      color: #8b949e
     }
 
     .modal-actions {
@@ -557,13 +623,14 @@
   </div>
 
   <div class="admin-content" id="admin-content">
-    <div class="header">
-      <h1>Token Management</h1>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="info" id="stats"></div>
-        <button class="btn btn-sm" onclick="doLogout()">Logout</button>
-      </div>
-    </div>
+    <div id="og-header"></div>
+    <script>
+      OneGateHeader.mount('#og-header', {
+        active: 'admin',
+        title: 'Token Management',
+        actions: '<div class="info" id="stats"></div><a class="btn btn-sm" href="/models">Model Catalog</a><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+      });
+    </script>
     <div class="container">
       <div class="toolbar">
         <h2 id="token-count"></h2>
@@ -579,15 +646,16 @@
             <th>Token</th>
             <th>Describe</th>
             <th>Providers</th>
+            <th>Models</th>
             <th>Admin</th>
             <th>Enabled</th>
             <th>Rate Limits</th>
+            <th>5h</th>
             <th>1d</th>
             <th>7d</th>
-            <th>30d</th>
             <th>Created</th>
             <th>Top Tool</th>
-            <th>Actions</th>
+            <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody id="token-tbody"></tbody>
@@ -604,11 +672,16 @@
         </div>
         <div class="form-group">
           <label>Describe</label>
-          <input type="text" id="modal-describe" placeholder="describe the token usage..." style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,monospace">
+          <input type="text" id="modal-describe" placeholder="describe the token usage..." style="font-family:var(--font-all)">
         </div>
         <div class="form-group">
           <label>Providers</label>
           <div class="checkbox-group" id="modal-providers"></div>
+        </div>
+        <div class="form-group">
+          <label>Visible models</label>
+          <div class="checkbox-group scroll" id="modal-models"></div>
+          <div class="form-hint" id="modal-models-hint">Checked ids are the only ones this token sees in /v1/models. * (all models) exposes the whole catalog.</div>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:10px">
           <label style="margin:0;text-transform:none;font-size:13px;color:#c9d1d9">Admin</label>
@@ -618,24 +691,29 @@
           </label>
         </div>
         <div class="form-group" style="margin-top:8px">
-          <label>Rate Limits (-1 = unlimited, 0 = not allowed)</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:6px">
-            <div>
-              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPM</label>
-              <input type="number" id="modal-rpm" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPH</label>
-              <input type="number" id="modal-rph" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPD</label>
-              <input type="number" id="modal-rpd" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#8b949e;margin-bottom:2px;display:block">RPT</label>
-              <input type="number" id="modal-rpt" value="-1" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 8px;border-radius:6px;font-size:13px">
-            </div>
+          <label>Rate Limits (-1 = unlimited, 0 = not allowed; token limits in M)</label>
+          <div style="font-size:11px;color:#8b949e;margin-top:6px;margin-bottom:2px">Requests</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div><label class="rl-label">RPM</label><input type="number" id="modal-rpm" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">RPH</label><input type="number" id="modal-rph" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">RPD</label><input type="number" id="modal-rpd" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">RPW</label><input type="number" id="modal-rpw" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">RP月</label><input type="number" id="modal-rpmo" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">RPT</label><input type="number" id="modal-rpt" value="-1" class="rl-input"></div>
+          </div>
+          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">Tokens (M)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div><label class="rl-label">TPM</label><input type="number" step="any" id="modal-tpm" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">TPH</label><input type="number" step="any" id="modal-tph" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">TPD</label><input type="number" step="any" id="modal-tpd" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">TPW</label><input type="number" step="any" id="modal-tpw" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">TP月</label><input type="number" step="any" id="modal-tpmo" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">TPT</label><input type="number" step="any" id="modal-tpt" value="-1" class="rl-input"></div>
+          </div>
+          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">Cache token weights (-1 = inherit global)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><label class="rl-label">cache_read</label><input type="number" step="any" id="modal-cache_read_weight" value="-1" class="rl-input"></div>
+            <div><label class="rl-label">cache_write</label><input type="number" step="any" id="modal-cache_write_weight" value="-1" class="rl-input"></div>
           </div>
         </div>
         <div class="modal-actions">
@@ -661,6 +739,7 @@
     const API_BASE = '';
     let adminToken = null;
     let editingToken = null;
+    let catalogModels = null;
 
     function apiHeaders() {
       return { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
@@ -747,9 +826,21 @@
           tip.classList.add('show');
           return;
         }
+        const pcell = e.target.closest('.providers-cell [data-tip]');
+        if (pcell) {
+          utip.innerHTML = pcell.dataset.tip || '';
+          utip.classList.add('show');
+          return;
+        }
         const ucell = e.target.closest('.usage-cell');
         if (ucell) {
           utip.innerHTML = ucell.dataset.tip || '';
+          utip.classList.add('show');
+          return;
+        }
+        const lcell = e.target.closest('.limits-cell');
+        if (lcell) {
+          utip.innerHTML = lcell.dataset.tip || '';
           utip.classList.add('show');
         }
       });
@@ -761,7 +852,13 @@
         if (e.target.closest && e.target.closest('.token-cell')) {
           tip.classList.remove('show');
         }
+        if (e.target.closest && e.target.closest('.providers-cell [data-tip]')) {
+          utip.classList.remove('show');
+        }
         if (e.target.closest && e.target.closest('.usage-cell')) {
+          utip.classList.remove('show');
+        }
+        if (e.target.closest && e.target.closest('.limits-cell')) {
           utip.classList.remove('show');
         }
       });
@@ -775,24 +872,86 @@
     })();
 
     function renderProviders(provs) {
-      if (provs.includes('*')) return '<span class="tag tag-all">* (all)</span>';
-      return provs.map(p => `<span class="tag">${esc(p)}</span>`).join('');
+      if (provs.includes('*')) return '<span class="tag tag-all">All</span>';
+      const tip = provs.map(p => `<div>${esc(p)}</div>`).join('');
+      return `<span class="tag" data-tip="${escAttr('<div class="ut-title">Providers</div>' + tip)}">${provs.length}</span>`;
+    }
+
+    const RL_FIELDS = [
+      ['rpm','RPM'], ['rph','RPH'], ['rpd','RPD'], ['rpw','RPW'], ['rpmo','RP月'], ['rpt','RPT'],
+      ['tpm','TPM'], ['tph','TPH'], ['tpd','TPD'], ['tpw','TPW'], ['tpmo','TP月'], ['tpt','TPT']
+    ];
+    const TP_FIELD_SET = new Set(['tpm','tph','tpd','tpw','tpmo','tpt']);
+    const WEIGHT_FIELDS = ['cache_read_weight', 'cache_write_weight'];
+
+    function rateLimitsTooltip(t) {
+      const rows = [];
+      for (const [key, label] of RL_FIELDS) {
+        const v = t[key];
+        if (v === undefined || v === null || v === -1) continue;
+        let display = v;
+        if (TP_FIELD_SET.has(key)) {
+          const m = v / 1e6;
+          display = (Number.isInteger(m) ? m : m.toFixed(2)) + 'M';
+        }
+        rows.push(`<tr><td style="color:#8b949e;padding:2px 14px 2px 0">${label}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${display}</td></tr>`);
+      }
+      for (const key of WEIGHT_FIELDS) {
+        const v = t[key];
+        if (v === undefined || v === null || v === -1) continue;
+        const label = key === 'cache_read_weight' ? 'cache_read w' : 'cache_write w';
+        rows.push(`<tr><td style="color:#8b949e;padding:2px 14px 2px 0">${label}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${v}</td></tr>`);
+      }
+      if (!rows.length) return '<div class="ut-title">Rate Limits</div><div style="color:#8b949e">Unlimited</div>';
+      return '<div class="ut-title">Rate Limits</div><table>' + rows.join('') + '</table>';
     }
 
     function renderRateLimits(t) {
-      const rpm = t.rpm ?? -1;
-      const rph = t.rph ?? -1;
-      const rpd = t.rpd ?? -1;
-      const rpt = t.rpt ?? -1;
-      if (rpm === -1 && rph === -1 && rpd === -1 && rpt === -1) {
-        return '<span style="color:#8b949e;font-size:11px">Unlimited</span>';
+      let n = 0;
+      for (const [key] of RL_FIELDS) if (t[key] !== undefined && t[key] !== null && t[key] !== -1) n++;
+      for (const key of WEIGHT_FIELDS) if (t[key] !== undefined && t[key] !== null && t[key] !== -1) n++;
+      if (!n) return '<span style="color:#8b949e;font-size:11px">Unlimited</span>';
+      return `<span class="rl-pill">⚙ ${n}</span>`;
+    }
+
+    function resetLimitInputs() {
+      for (const [key] of RL_FIELDS) document.getElementById('modal-' + key).value = '-1';
+      for (const key of WEIGHT_FIELDS) document.getElementById('modal-' + key).value = '-1';
+    }
+
+    function populateLimitInputs(t) {
+      for (const [key] of RL_FIELDS) {
+        const el = document.getElementById('modal-' + key);
+        const v = t[key] ?? -1;
+        if (v === -1) el.value = -1;
+        else if (TP_FIELD_SET.has(key)) el.value = v / 1e6;
+        else el.value = v;
       }
-      const parts = [];
-      if (rpm !== -1) parts.push(`<span style="color:#58a6ff" title="RPM">${rpm}</span>`);
-      if (rph !== -1) parts.push(`<span style="color:#58a6ff" title="RPH">${rph}</span>`);
-      if (rpd !== -1) parts.push(`<span style="color:#58a6ff" title="RPD">${rpd}</span>`);
-      if (rpt !== -1) parts.push(`<span style="color:#58a6ff" title="RPT">${rpt}</span>`);
-      return parts.join(' <span style="color:#30363d">|</span> ');
+      for (const key of WEIGHT_FIELDS) {
+        document.getElementById('modal-' + key).value = t[key] ?? -1;
+      }
+    }
+
+    function readLimitInputs() {
+      const limits = {};
+      for (const [key] of RL_FIELDS) {
+        const raw = document.getElementById('modal-' + key).value;
+        if (raw === '' || raw === null) { limits[key] = -1; continue; }
+        if (TP_FIELD_SET.has(key)) {
+          const f = parseFloat(raw);
+          limits[key] = isNaN(f) ? -1 : (f === -1 ? -1 : f);
+        } else {
+          const n = parseInt(raw, 10);
+          limits[key] = isNaN(n) ? -1 : n;
+        }
+      }
+      for (const key of WEIGHT_FIELDS) {
+        const raw = document.getElementById('modal-' + key).value;
+        if (raw === '' || raw === null) { limits[key] = -1; continue; }
+        const f = parseFloat(raw);
+        limits[key] = isNaN(f) ? -1 : f;
+      }
+      return limits;
     }
 
     function fmtNum(n) {
@@ -907,13 +1066,15 @@
       const adminBadge = t.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-user">User</span>';
       const shortToken = t.token.slice(0, 6);
       const u = usageMap[t.token] || {};
-      const req1d = (u['1d'] && u['1d'].requests != null) ? u['1d'].requests : (u['1d'] || 0);
-      const req7d = (u['7d'] && u['7d'].requests != null) ? u['7d'].requests : (u['7d'] || 0);
-      const req30d = (u['30d'] && u['30d'].requests != null) ? u['30d'].requests : (u['30d'] || 0);
+      const tokenNums = (wd) => {
+        const d = windowDetail(wd);
+        return `<span class="tk-in">${fmtNum(d.input)}</span> <span class="tk-out">${fmtNum(d.output)}</span> <span class="tk-cr">${fmtNum(d.cache_read)}</span>`;
+      };
       return `<tr data-token="${esc(t.token)}">
     <td class="token-cell" data-full="${esc(t.token)}">${esc(shortToken)}...</td>
     <td style="font-size:12px;color:#8b949e;white-space:nowrap" title="${esc(t.describe || '')}">${esc(t.describe || '-')}</td>
     <td><div class="providers-cell">${renderProviders(t.providers)}</div></td>
+    <td>${renderModels(t.models)}</td>
     <td>${adminBadge}</td>
     <td>
       <label class="toggle">
@@ -921,13 +1082,13 @@
         <span class="slider"></span>
       </label>
     </td>
-    <td style="font-size:11px">${renderRateLimits(t)}</td>
-    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['1d']))}"><div class="uc-num">${req1d}</div>${miniStack(windowDetail(u['1d']))}</td>
-    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['7d']))}"><div class="uc-num">${req7d}</div>${miniStack(windowDetail(u['7d']))}</td>
-    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['30d']))}"><div class="uc-num">${req30d}</div>${miniStack(windowDetail(u['30d']))}</td>
+    <td class="limits-cell" style="font-size:11px" data-tip="${escAttr(rateLimitsTooltip(t))}">${renderRateLimits(t)}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['5h']))}"><div class="uc-num">${tokenNums(u['5h'])}</div>${miniStack(windowDetail(u['5h']))}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['1d']))}"><div class="uc-num">${tokenNums(u['1d'])}</div>${miniStack(windowDetail(u['1d']))}</td>
+    <td class="usage-cell" data-tip="${escAttr(usageTooltip(u['7d']))}"><div class="uc-num">${tokenNums(u['7d'])}</div>${miniStack(windowDetail(u['7d']))}</td>
     <td style="font-size:12px;color:#8b949e">${fmtDate(t.created_at)}</td>
     <td style="font-size:11px;color:${u.top_client && u.top_client.client !== 'unknown' ? '#79c0ff' : '#8b949e'}" title="${esc(topClientTooltip(u))}">${esc(topClientLabel(u))}</td>
-    <td>
+    <td class="col-actions">
       <button class="btn btn-sm" onclick="showEditModal('${esc(t.token)}')">Edit</button>
       <button class="btn btn-sm" onclick="openUsage('${esc(t.token)}')">Usage</button>
       <button class="btn btn-sm btn-danger" onclick="confirmDelete('${esc(t.token)}')">Delete</button>
@@ -947,7 +1108,7 @@
       const usageMap = usageRes.ok ? (usageRes.data.usage || {}) : {};
       const tbody = document.getElementById('token-tbody');
       if (!tokensRes.data.tokens || tokensRes.data.tokens.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="empty">No tokens</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="empty">No tokens</td></tr>';
       } else {
         tbody.innerHTML = tokensRes.data.tokens.map(t => renderRow(t, usageMap)).join('');
       }
@@ -972,7 +1133,55 @@
       return vals.includes('*') ? ['*'] : vals;
     }
 
-    function showCreateModal() {
+    async function ensureCatalog() {
+      const result = await api('GET', '/admin/api/models');
+      if (result.ok) {
+        catalogModels = (result.data.models || []).map(m => m.model);
+      } else if (catalogModels === null) {
+        catalogModels = [];
+      }
+    }
+
+    function buildModelCheckboxes(containerId, selected) {
+      const c = document.getElementById(containerId);
+      const chosen = Array.isArray(selected) ? selected.slice() : [];
+      const hasAll = chosen.includes('*');
+      const ids = ['*'];
+      for (const id of (catalogModels || [])) {
+        if (!ids.includes(id)) ids.push(id);
+      }
+      for (const id of chosen) {
+        if (!ids.includes(id)) ids.push(id);
+      }
+      c.innerHTML = ids.map(id => {
+        const checked = hasAll ? id === '*' : chosen.includes(id);
+        const label = id === '*' ? '* (all models)' : id;
+        return `<label><input type="checkbox" value="${escAttr(id)}" ${checked ? 'checked' : ''}>${esc(label)}</label>`;
+      }).join('');
+      const hint = document.getElementById(containerId + '-hint');
+      if (hint) {
+        hint.textContent = (catalogModels && catalogModels.length)
+          ? 'Checked ids are the only ones this token sees in /v1/models. * (all models) exposes the whole catalog.'
+          : 'The model catalog is empty. Add models in Model Catalog first.';
+      }
+    }
+
+    function getSelectedModels(containerId) {
+      const checks = document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`);
+      const vals = Array.from(checks).map(c => c.value);
+      return vals.includes('*') ? ['*'] : vals;
+    }
+
+    function renderModels(models) {
+      const list = Array.isArray(models) ? models : [];
+      if (list.includes('*')) return '<span class="tag tag-all">* (all)</span>';
+      if (list.length === 0) return '<span style="color:#8b949e;font-size:11px">None</span>';
+      const text = list.join(', ');
+      return `<span class="models-cell" title="${escAttr(text)}">${esc(text)}</span>`;
+    }
+
+    async function showCreateModal() {
+      await ensureCatalog();
       editingToken = null;
       document.getElementById('modal-title').textContent = 'New Token';
       document.getElementById('modal-token').value = '';
@@ -980,10 +1189,8 @@
       document.getElementById('modal-describe').value = '';
       document.getElementById('modal-admin').checked = false;
       buildProviderCheckboxes('modal-providers', ['*']);
-      document.getElementById('modal-rpm').value = '-1';
-      document.getElementById('modal-rph').value = '-1';
-      document.getElementById('modal-rpd').value = '-1';
-      document.getElementById('modal-rpt').value = '-1';
+      buildModelCheckboxes('modal-models', ['*']);
+      resetLimitInputs();
       document.getElementById('modal-submit').textContent = 'Create';
       document.getElementById('modal-overlay').classList.add('active');
     }
@@ -996,6 +1203,7 @@
       }
       const t = data.tokens ? data.tokens.find(x => x.token === token) : null;
       if (!t) return;
+      await ensureCatalog();
       editingToken = token;
       document.getElementById('modal-title').textContent = 'Edit Token';
       document.getElementById('modal-token').value = token;
@@ -1003,10 +1211,8 @@
       document.getElementById('modal-describe').value = t.describe || '';
       document.getElementById('modal-admin').checked = t.is_admin;
       buildProviderCheckboxes('modal-providers', t.providers);
-      document.getElementById('modal-rpm').value = t.rpm ?? -1;
-      document.getElementById('modal-rph').value = t.rph ?? -1;
-      document.getElementById('modal-rpd').value = t.rpd ?? -1;
-      document.getElementById('modal-rpt').value = t.rpt ?? -1;
+      buildModelCheckboxes('modal-models', Array.isArray(t.models) ? t.models : ['*']);
+      populateLimitInputs(t);
       document.getElementById('modal-submit').textContent = 'Save';
       document.getElementById('modal-overlay').classList.add('active');
     }
@@ -1017,21 +1223,24 @@
 
     async function submitModal() {
       const provs = getSelectedProviders('modal-providers');
+      const models = getSelectedModels('modal-models');
       const isAdmin = document.getElementById('modal-admin').checked;
       const describe = document.getElementById('modal-describe').value.trim();
-      const rpm = parseInt(document.getElementById('modal-rpm').value) || -1;
-      const rph = parseInt(document.getElementById('modal-rph').value) || -1;
-      const rpd = parseInt(document.getElementById('modal-rpd').value) || -1;
-      const rpt = parseInt(document.getElementById('modal-rpt').value) || -1;
+      const limits = readLimitInputs();
+      if (!models.length) {
+        toast('Select at least one visible model');
+        return;
+      }
       let result;
       if (!editingToken) {
         const customToken = document.getElementById('modal-token').value.trim();
         result = await api('POST', '/admin/api/tokens', {
           token: customToken || undefined,
           providers: provs,
+          models: models,
           is_admin: isAdmin,
           describe: describe,
-          rpm, rph, rpd, rpt,
+          ...limits,
         });
       } else {
         const tokenValue = document.getElementById('modal-token').value.trim();
@@ -1039,9 +1248,10 @@
           token: editingToken,
           new_token: tokenValue,
           providers: provs,
+          models: models,
           is_admin: isAdmin,
           describe: describe,
-          rpm, rph, rpd, rpt,
+          ...limits,
         });
       }
       if (!result.ok) {
@@ -1119,6 +1329,19 @@
       toast('Token deleted', 'success');
     }
 
+    document.getElementById('modal-models').addEventListener('change', function (e) {
+      const box = e.target;
+      if (box.type !== 'checkbox') return;
+      if (box.value === '*' && box.checked) {
+        this.querySelectorAll('input[type=checkbox]').forEach(x => {
+          if (x.value !== '*') x.checked = false;
+        });
+      } else if (box.value !== '*' && box.checked) {
+        const all = this.querySelector('input[value="*"]');
+        if (all) all.checked = false;
+      }
+    });
+
     document.getElementById('modal-overlay').addEventListener('click', function (e) {
       if (e.target === this) hideModal();
     });
@@ -1146,6 +1369,7 @@
         localStorage.setItem('admin_token', document.getElementById('login-remember').checked ? token : '');
         document.getElementById('login-overlay').classList.add('hidden');
         document.getElementById('admin-content').classList.add('active');
+        await ensureCatalog();
         loadTokens();
       } catch (e) {
         document.getElementById('login-error').textContent = 'Network error';
@@ -1154,6 +1378,7 @@
 
     function doLogout() {
       adminToken = null;
+      catalogModels = null;
       localStorage.removeItem('admin_token');
       document.getElementById('login-token').value = '';
       document.getElementById('login-overlay').classList.remove('hidden');

@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Client Stats</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .container {
       max-width: 1100px
@@ -40,6 +41,13 @@
     .range-picker input:focus {
       outline: none;
       border-color: #58a6ff
+    }
+
+    .range-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: none
     }
 
     .summary-grid {
@@ -187,7 +195,6 @@
       color: #8b949e;
       font-weight: 600;
       font-size: 12px;
-      text-transform: uppercase;
       letter-spacing: .5px;
       white-space: nowrap
     }
@@ -253,23 +260,48 @@
       color: #484f58;
       font-size: 13px
     }
+
+    @media (max-width: 900px) {
+      .og-actions {
+        order: 5;
+        flex-basis: 100%;
+        margin-left: 0;
+        justify-content: flex-start
+      }
+
+      .og-actions .range-picker {
+        width: 100%;
+        flex-wrap: wrap
+      }
+    }
+
+    @media (max-width: 640px) {
+      .og-actions .range-picker {
+        gap: 6px 8px
+      }
+
+      .og-actions .range-picker>span {
+        display: none
+      }
+
+      .og-actions .range-picker input {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0
+      }
+    }
   </style>
 </head>
 
 <body>
-  <div class="header">
-    <h1>Client Stats</h1>
-    <div class="range-picker">
-      <span>Range</span>
-      <input type="datetime-local" id="startInput">
-      <span>~</span>
-      <input type="datetime-local" id="endInput">
-      <button class="btn btn-sm" onclick="loadData()">Apply</button>
-      <button class="btn btn-sm" onclick="setRange(24)">24h</button>
-      <button class="btn btn-sm" onclick="setRange(168)">7d</button>
-      <button class="btn btn-sm" onclick="setRange(720)">30d</button>
-    </div>
-  </div>
+  <div id="og-header"></div>
+  <script>
+    OneGateHeader.mount('#og-header', {
+      active: 'clients',
+      title: 'Client Stats',
+      actions: '<div class="range-picker"><span>Range</span><input type="datetime-local" id="startInput" aria-label="Range start"><span>~</span><input type="datetime-local" id="endInput" aria-label="Range end"><div class="range-btns"><button class="btn btn-sm" onclick="loadData()">Apply</button><button class="btn btn-sm" onclick="setRange(24)">24h</button><button class="btn btn-sm" onclick="setRange(168)">7d</button><button class="btn btn-sm" onclick="setRange(720)">30d</button></div></div>'
+    });
+  </script>
 
   <div class="container">
     <div class="card">
