@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 
 from aiohttp import web
 
+from src.db import get_rate_limit_status
+
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
@@ -90,15 +92,22 @@ class ThroughputMonitor:
             if not session:
                 dead.append(sid)
                 continue
+            queue = session.queue
+            if queue.full() and event_type == "chunk":
+                continue
             try:
-                session.queue.put_nowait(encoded)
+                queue.put_nowait(encoded)
             except asyncio.QueueFull:
-                dead.append(sid)
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(encoded)
+                except (asyncio.QueueEmpty, asyncio.QueueFull):
+                    dead.append(sid)
         for sid in dead:
             self.remove_session(sid)
 
 
-def create_throughput_handlers(monitor: ThroughputMonitor, token_pool: dict):
+def create_throughput_handlers(monitor: ThroughputMonitor, token_pool: dict, db_conn):
     async def serve_throughput_page(request: web.Request) -> web.Response:
         html_path = os.path.join(STATIC_DIR, "throughput.html")
         if not os.path.exists(html_path):
@@ -136,40 +145,61 @@ def create_throughput_handlers(monitor: ThroughputMonitor, token_pool: dict):
         )
         await resp.prepare(request)
 
+        def build_limits_payload() -> bytes | None:
+            entry = token_pool.get(session.token)
+            if not entry or not entry.has_limits:
+                return None
+            limits = get_rate_limit_status(db_conn, entry)
+            if not limits:
+                return None
+            payload = json.dumps({"limits": limits}, ensure_ascii=False)
+            return f"event: limits\ndata: {payload}\n\n".encode("utf-8")
+
         try:
             await resp.write(b"event: connected\ndata: {}\n\n")
         except ConnectionError:
             monitor.remove_session(sid)
             return resp
 
-        async def keepalive():
-            while True:
-                await asyncio.sleep(15)
-                try:
-                    await resp.write(b": keepalive\n\n")
-                except ConnectionError:
-                    break
+        init_limits = build_limits_payload()
+        if init_limits:
+            try:
+                await resp.write(init_limits)
+            except ConnectionError:
+                monitor.remove_session(sid)
+                return resp
 
-        task = asyncio.ensure_future(keepalive())
-
+        now_mono = time.monotonic()
+        last_limits = now_mono
+        last_ping = now_mono
         try:
             while True:
-                if task.done():
+                if monitor.sessions.get(sid) is not session:
                     break
                 try:
                     chunk = await asyncio.wait_for(session.queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
+                    now = time.monotonic()
+                    if now - last_ping >= 15:
+                        try:
+                            await resp.write(b"event: ping\ndata: {}\n\n")
+                        except ConnectionError:
+                            break
+                        last_ping = now
+                    if now - last_limits >= 5:
+                        snap = build_limits_payload()
+                        if snap:
+                            try:
+                                await resp.write(snap)
+                            except ConnectionError:
+                                break
+                        last_limits = now
                     continue
                 try:
                     await resp.write(chunk)
                 except ConnectionError:
                     break
         finally:
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
             monitor.remove_session(sid)
 
         return resp
@@ -223,6 +253,7 @@ class ThroughputTracker:
         self.exact_cache_write = 0
         self.has_exact = False
         self.first_token_time = 0.0
+        self.input_is_inclusive = False
 
         self.chunks: list[bytes] = []
 
@@ -243,7 +274,9 @@ class ThroughputTracker:
     @property
     def final_usage(self) -> tuple[int, int, int, int]:
         return (
-            self.exact_input,
+            normalize_inclusive_input(
+                self.exact_input, self.exact_cache_read, self.input_is_inclusive
+            ),
             self.exact_output,
             self.exact_cache_read,
             self.exact_cache_write,
@@ -254,7 +287,7 @@ class ThroughputTracker:
             return
         start_data = {
             "id": self.req_id,
-            "time": time.time() * 1000,
+            "time": round(time.time() * 1000),
             "model": self.model,
             "provider": self.provider,
             "input_tokens": self.input_est,
@@ -304,6 +337,7 @@ class ThroughputTracker:
         pi, po, cr, cw = _extract_usage_from_json(body)
         if pi:
             self.exact_input = pi
+            self.input_is_inclusive = False
         if po:
             self.exact_output = po
             self.has_exact = True
@@ -334,6 +368,7 @@ class ThroughputTracker:
             pi, po, cr, cw = _extract_usage_from_sse(self.line_buf)
             if pi:
                 self.exact_input = pi
+                self.input_is_inclusive = False
             if po and not self.has_exact:
                 self.exact_output = po
                 self.has_exact = True
@@ -395,6 +430,11 @@ class ThroughputTracker:
         self.monitor.broadcast(self.proxy_token, "end", end_data)
 
     def _parse_stream_chunk(self, chunk: bytes, content_type: str) -> None:
+        def mark_token() -> None:
+            self.data_line_count += 1
+            if self.first_token_time == 0.0:
+                self.first_token_time = time.monotonic()
+
         if content_type and "text/event-stream" in content_type:
             self.is_stream = True
         if not self.is_stream:
@@ -419,8 +459,10 @@ class ThroughputTracker:
                 ot = usage.get("output_tokens")
                 if pt:
                     self.exact_input = pt
+                    self.input_is_inclusive = True
                 if it:
                     self.exact_input = it
+                    self.input_is_inclusive = False
                 if ct:
                     self.exact_output = ct
                     self.has_exact = True
@@ -437,20 +479,30 @@ class ThroughputTracker:
                 if cw:
                     self.exact_cache_write = cw
             else:
-                choices = obj.get("choices", [])
-                for ch in choices:
+                counted = False
+                for ch in obj.get("choices", []):
                     delta = ch.get("delta", {})
-                    if isinstance(delta.get("content"), str) and delta["content"]:
-                        self.data_line_count += 1
-                        if self.first_token_time == 0.0:
-                            self.first_token_time = time.monotonic()
-                msg_type = obj.get("type", "")
-                if msg_type == "content_block_delta":
+                    for key in (
+                        "content",
+                        "reasoning_content",
+                        "reasoning",
+                        "thinking",
+                    ):
+                        if isinstance(delta.get(key), str) and delta[key]:
+                            mark_token()
+                            counted = True
+                            break
+                if not counted:
+                    if isinstance(obj.get("thinking"), str) and obj["thinking"]:
+                        mark_token()
+                        counted = True
+                if not counted and obj.get("type", "") == "content_block_delta":
                     delta = obj.get("delta", {})
-                    if isinstance(delta.get("text"), str) and delta["text"]:
-                        self.data_line_count += 1
-                        if self.first_token_time == 0.0:
-                            self.first_token_time = time.monotonic()
+                    if delta.get("type") == "thinking_delta":
+                        if isinstance(delta.get("thinking"), str) and delta["thinking"]:
+                            mark_token()
+                    elif isinstance(delta.get("text"), str) and delta["text"]:
+                        mark_token()
 
 
 def _estimate_input_tokens(body: bytes | None) -> int:
@@ -509,11 +561,20 @@ def _extract_cache_from_usage(usage: dict) -> tuple[int, int]:
     return cache_read, cache_write
 
 
+def normalize_inclusive_input(
+    input_tokens: int, cache_read: int, inclusive: bool
+) -> int:
+    if inclusive and cache_read > 0:
+        return max(0, input_tokens - cache_read)
+    return input_tokens
+
+
 def _extract_usage_from_sse(line_buffer: str) -> tuple[int, int, int, int]:
     input_tokens = 0
     output_tokens = 0
     cache_read = 0
     cache_write = 0
+    inclusive = True
     for line in line_buffer.split("\n"):
         if not line.startswith("data:"):
             continue
@@ -533,11 +594,13 @@ def _extract_usage_from_sse(line_buffer: str) -> tuple[int, int, int, int]:
                     output_tokens += 1
         else:
             if "prompt_tokens" in usage:
+                inclusive = True
                 input_tokens = usage.get("prompt_tokens", input_tokens)
                 ct = usage.get("completion_tokens", 0)
                 if ct:
                     output_tokens = ct
             elif "input_tokens" in usage:
+                inclusive = False
                 it = usage.get("input_tokens", 0)
                 if it:
                     input_tokens = it
@@ -549,6 +612,7 @@ def _extract_usage_from_sse(line_buffer: str) -> tuple[int, int, int, int]:
                 cache_read = cr
             if cw:
                 cache_write = cw
+    input_tokens = normalize_inclusive_input(input_tokens, cache_read, inclusive)
     return input_tokens, output_tokens, cache_read, cache_write
 
 
@@ -561,13 +625,17 @@ def _extract_usage_from_json(body: bytes | None) -> tuple[int, int, int, int]:
         if usage:
             input_tokens = 0
             output_tokens = 0
-            if "prompt_tokens" in usage:
+            inclusive = "prompt_tokens" in usage
+            if inclusive:
                 input_tokens = usage.get("prompt_tokens", 0)
                 output_tokens = usage.get("completion_tokens", 0)
-            elif "input_tokens" in usage:
+            else:
                 input_tokens = usage.get("input_tokens", 0)
                 output_tokens = usage.get("output_tokens", 0)
             cache_read, cache_write = _extract_cache_from_usage(usage)
+            input_tokens = normalize_inclusive_input(
+                input_tokens, cache_read, inclusive
+            )
             return input_tokens, output_tokens, cache_read, cache_write
         return 0, 0, 0, 0
     except Exception:

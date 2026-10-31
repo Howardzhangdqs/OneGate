@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Throughput Monitor</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .login-overlay {
       display: flex;
@@ -48,7 +49,6 @@
       margin-bottom: 8px;
       font-size: 12px;
       color: #8b949e;
-      text-transform: uppercase;
       letter-spacing: .5px
     }
 
@@ -60,7 +60,7 @@
       border: 1px solid #30363d;
       color: #c9d1d9;
       border-radius: 6px;
-      font-family: monospace
+      font-family: var(--font-all)
     }
 
     .login-box .form-group input:focus {
@@ -170,6 +170,43 @@
       font-size: 22px
     }
 
+    .limits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px
+    }
+
+    .limit-item .limit-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px
+    }
+
+    .limit-item .limit-label {
+      font-weight: 600;
+      font-size: 13px
+    }
+
+    .limit-item .limit-val {
+      font-size: 11px;
+      color: #8b949e;
+      text-variant-numeric: tabular-nums
+    }
+
+    .limit-bar {
+      height: 8px;
+      background: #21262d;
+      border-radius: 4px;
+      overflow: hidden
+    }
+
+    .limit-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .3s ease
+    }
+
     table {
       width: max-content;
       min-width: 100%
@@ -188,7 +225,7 @@
     .col-status { width: 40px; text-align: center }
 
     .mono {
-      font-family: monospace;
+      font-family: var(--font-all);
       font-variant-numeric: tabular-nums
     }
 
@@ -249,7 +286,7 @@
     }
 
     .req-tooltip .tt-value {
-      font-family: monospace;
+      font-family: var(--font-all);
       word-break: break-all
     }
 
@@ -257,7 +294,7 @@
       background: #0d1117;
       padding: 6px 8px;
       border-radius: 4px;
-      font-family: monospace;
+      font-family: var(--font-all);
       white-space: pre-wrap;
       word-break: break-all;
       margin-top: 2px;
@@ -322,7 +359,7 @@
       background: #0d1117;
       border-radius: 4px;
       padding: 8px 10px;
-      font-family: monospace;
+      font-family: var(--font-all);
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-all;
@@ -354,13 +391,14 @@
   </div>
 
   <div class="main-content" id="main-content">
-    <div class="header">
-      <h1>Throughput Monitor</h1>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="info" id="status-info"></div>
-        <button class="btn btn-sm" onclick="doLogout()">Logout</button>
-      </div>
-    </div>
+    <div id="og-header"></div>
+    <script>
+      OneGateHeader.mount('#og-header', {
+        active: 'throughput',
+        title: 'Throughput Monitor',
+        actions: '<div class="info" id="status-info"></div><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+      });
+    </script>
     <div class="container">
       <div class="status-bar">
         <span><span class="status-dot connecting" id="status-dot"></span><span id="status-text">Connecting...</span></span>
@@ -376,6 +414,11 @@
           <div class="summary-item"><div class="value" id="sum-avg-tps">-</div><div class="label">Avg Output TPS</div></div>
           <div class="summary-item"><div class="value" id="sum-avg-dur">-</div><div class="label">Avg Duration</div></div>
         </div>
+      </div>
+
+      <div class="card" id="limits-card" style="display:none">
+        <h3>Rate Limits</h3>
+        <div class="limits-grid" id="limits-grid"></div>
       </div>
 
       <div class="card">
@@ -419,6 +462,10 @@
     let eventSource = null;
     let sessionId = null;
     let proxyToken = null;
+    let reconnectTimer = null;
+    let reconnectAttempts = 0;
+    let everConnected = false;
+    let lastActivity = 0;
     let requests = {};
     let totalFinished = 0;
     let sumInTokens = 0;
@@ -431,6 +478,10 @@
     function startLiveTimer() {
       if (liveTimer) return;
       liveTimer = setInterval(() => {
+        if (eventSource && lastActivity && Date.now() - lastActivity > 40000) {
+          forceReconnect('Stream stalled, reconnecting...');
+          return;
+        }
         const now = Date.now();
         for (const id in requests) {
           const req = requests[id];
@@ -444,6 +495,7 @@
           if (ttftCell && req.ttft_ms == null) {
             ttftCell.textContent = fmtDur(liveDur);
           }
+          if (pinnedId === id) updatePinnedFields(req);
         }
       }, 300);
     }
@@ -460,6 +512,9 @@
       }
       document.getElementById('login-error').textContent = '';
       proxyToken = token;
+      clearReconnectTimer();
+      reconnectAttempts = 0;
+      everConnected = false;
 
       try {
         const resp = await fetch('/throughput/api/session', {
@@ -486,6 +541,9 @@
 
     function doLogout() {
       proxyToken = null;
+      clearReconnectTimer();
+      reconnectAttempts = 0;
+      everConnected = false;
       if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -495,6 +553,7 @@
       document.getElementById('login-token').value = '';
       document.getElementById('login-overlay').classList.remove('hidden');
       document.getElementById('main-content').classList.remove('active');
+      stopLiveTimer();
       resetStats();
     }
 
@@ -511,17 +570,87 @@
       }
     })();
 
+    function noteActivity() {
+      lastActivity = Date.now();
+    }
+
+    function clearReconnectTimer() {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    function forceReconnect(message) {
+      stopLiveTimer();
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      sessionId = null;
+      reconnectAttempts = 0;
+      if (message) statusText.textContent = message;
+      scheduleReconnect();
+    }
+
+    function scheduleReconnect() {
+      if (!proxyToken || reconnectTimer) return;
+      const delay = Math.min(15000, 1000 * Math.pow(2, reconnectAttempts));
+      reconnectAttempts++;
+      if (reconnectAttempts > 1) {
+        statusText.textContent = 'Reconnecting in ' + Math.round(delay / 1000) + 's...';
+      }
+      reconnectTimer = setTimeout(reopenSession, delay);
+    }
+
+    async function reopenSession() {
+      reconnectTimer = null;
+      if (!proxyToken) return;
+      try {
+        const resp = await fetch('/throughput/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: proxyToken })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          if (resp.status === 403 || resp.status === 404) {
+            statusDot.className = 'status-dot disconnected';
+            statusText.textContent = 'Session invalid, please log in again';
+            return;
+          }
+          throw new Error(data.error || 'Failed');
+        }
+        sessionId = data.session_id;
+        connectSSE();
+      } catch (e) {
+        scheduleReconnect();
+      }
+    }
+
     function connectSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
       eventSource = new EventSource('/throughput/events?sid=' + sessionId);
 
       eventSource.addEventListener('connected', () => {
+        noteActivity();
+        reconnectAttempts = 0;
         statusDot.className = 'status-dot connected';
+        if (!everConnected) {
+          everConnected = true;
+          resetStats();
+        }
         statusText.textContent = 'Connected';
-        resetStats();
         startLiveTimer();
       });
 
+      eventSource.addEventListener('ping', noteActivity);
+
       eventSource.addEventListener('start', e => {
+        noteActivity();
         const d = JSON.parse(e.data);
         requests[d.id] = { ...d, input_estimated: true, output_tokens: 0, ttft_ms: null, duration_ms: 0, tps: 0, status: null, lastUpdated: Date.now() };
         addRow(d.id, requests[d.id]);
@@ -530,6 +659,7 @@
       });
 
       eventSource.addEventListener('chunk', e => {
+        noteActivity();
         const d = JSON.parse(e.data);
         const req = requests[d.id];
         if (!req) return;
@@ -543,6 +673,7 @@
       });
 
       eventSource.addEventListener('end', e => {
+        noteActivity();
         const d = JSON.parse(e.data);
         const req = requests[d.id];
         if (!req) return;
@@ -569,16 +700,49 @@
         updateCounts();
       });
 
+      eventSource.addEventListener('limits', e => {
+        noteActivity();
+        renderLimits(JSON.parse(e.data));
+      });
+
       eventSource.onerror = () => {
         statusDot.className = 'status-dot disconnected';
-        statusText.textContent = 'Disconnected';
+        statusText.textContent = 'Connection lost, reconnecting...';
         stopLiveTimer();
         if (eventSource) {
           eventSource.close();
           eventSource = null;
         }
         sessionId = null;
+        scheduleReconnect();
       };
+    }
+
+    function fmtReset(s) {
+      if (s == null) return '';
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.round(s / 60) + 'm';
+      if (s < 86400) return Math.round(s / 3600) + 'h';
+      return Math.round(s / 86400) + 'd';
+    }
+
+    function renderLimits(data) {
+      const card = document.getElementById('limits-card');
+      const grid = document.getElementById('limits-grid');
+      const limits = (data && data.limits) || [];
+      if (!limits.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      grid.innerHTML = limits.map(l => {
+        const pct = Math.max(0, Math.min(100, l.percent));
+        const over = l.percent > 100;
+        const barColor = over ? '#f85149' : (l.percent > 80 ? '#d29922' : '#58a6ff');
+        const resetTxt = l.reset_in == null ? '' : ' · reset ' + fmtReset(l.reset_in);
+        return '<div class="limit-item">' +
+          '<div class="limit-head"><span class="limit-label">' + l.label + '</span>' +
+          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + l.unit + resetTxt + (over ? ' · OVER' : '') + '</span></div>' +
+          '<div class="limit-bar"><div class="limit-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+          '</div>';
+      }).join('');
     }
 
     function resetStats() {
@@ -603,31 +767,34 @@
     }
 
     function fmtNum(n) {
-      if (n == null || n === 0) return '-';
-      return n.toLocaleString();
+      const v = Number(n);
+      if (!Number.isFinite(v) || v === 0) return '-';
+      return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function fmtMs(ms) {
+      const v = Number(ms);
+      if (!Number.isFinite(v)) return '-';
+      if (v < 1000) return Math.round(v) + 'ms';
+      return (v / 1000).toFixed(1) + 's';
     }
 
     function fmtDur(ms) {
-      if (!ms) return '-';
-      if (ms < 1000) return ms + 'ms';
-      return (ms / 1000).toFixed(1) + 's';
+      if (ms == null) return '-';
+      return fmtMs(ms);
     }
 
     function fmtTps(tps) {
-      if (!tps) return '-';
-      return tps.toFixed(1);
+      const v = Number(tps);
+      if (!Number.isFinite(v) || v === 0) return '-';
+      return v.toFixed(1);
     }
 
     function fmtTTFT(ms, startTime, finished) {
-      if (ms != null) {
-        if (ms < 1000) return ms + 'ms';
-        return (ms / 1000).toFixed(1) + 's';
-      }
+      if (ms != null) return fmtMs(ms);
       if (finished) return '-';
       if (!startTime) return '-';
-      const live = Date.now() - startTime;
-      if (live < 1000) return live + 'ms';
-      return (live / 1000).toFixed(1) + 's';
+      return fmtMs(Date.now() - startTime);
     }
 
     function addRow(id, d) {
@@ -641,7 +808,7 @@
       tr.addEventListener('mouseleave', () => { if (!pinnedId) hideTooltip(); });
       tr.addEventListener('click', e => {
         if (pinnedId === id) { pinnedId = null; hideTooltip(); }
-        else { pinnedId = id; showTooltip(e, id, true); }
+        else { pinnedId = id; pinnedAnchor = { clientX: e.clientX, clientY: e.clientY }; showTooltip(e, id, true); }
       });
       if (tbody.firstChild) {
         tbody.insertBefore(tr, tbody.firstChild);
@@ -675,10 +842,7 @@
       if (!tr) return;
       tr.innerHTML = rowInner(d);
       tr.className = d.finished ? (d.status >= 400 ? 'row-error' : 'row-done') : 'row-active';
-      if (pinnedId === id) {
-        const fakeEvent = { clientX: parseInt(tooltip.style.left), clientY: parseInt(tooltip.style.top) };
-        showTooltip(fakeEvent, id, true);
-      }
+      if (pinnedId === id) refreshPinnedTooltip();
     }
 
     function rowInner(d) {
@@ -743,6 +907,13 @@
 
     const tooltip = document.getElementById('req-tooltip');
     let pinnedId = null;
+    let pinnedAnchor = null;
+
+    function refreshPinnedTooltip() {
+      const req = requests[pinnedId];
+      if (!req) return;
+      updatePinnedFields(req);
+    }
 
     function showTooltip(e, id, forceRefresh) {
       const req = requests[id];
@@ -754,7 +925,8 @@
       tooltip.classList.add('visible');
       if (isPinned) tooltip.classList.add('pinned');
       else tooltip.classList.remove('pinned');
-      positionTooltip(e);
+      positionTooltip(isPinned && pinnedAnchor ? pinnedAnchor : e);
+      if (isPinned) updatePinnedBodies(req);
     }
 
     function buildCompactHtml(req) {
@@ -774,19 +946,36 @@
       return html;
     }
 
+    function detailRow(label, value, field) {
+      return '<div class="tt-row"><span class="tt-label">' + label + ':</span> '
+        + '<span class="tt-value"' + (field ? ' data-tt="' + field + '"' : '') + '>'
+        + esc(String(value == null || value === '' ? '-' : value)) + '</span></div>';
+    }
+
+    function detailFields(req) {
+      return {
+        status: req.status != null ? req.status : 'streaming...',
+        input: (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens),
+        output: fmtNum(req.output_tokens),
+        tps: fmtTps(req.tps),
+        duration: req.finished ? fmtDur(req.duration_ms) : fmtDur(Date.now() - req.time),
+        ttft: fmtTTFT(req.ttft_ms, req.time, req.finished),
+      };
+    }
+
     function buildDetailHtml(req) {
-      const row = (label, value) => '<div class="tt-row"><span class="tt-label">' + label + ':</span> <span class="tt-value">' + esc(String(value || '-')) + '</span></div>';
+      const f = detailFields(req);
       let html = '<div style="font-size:14px;font-weight:600;color:#58a6ff;margin-bottom:8px">Request #' + esc(req.id || '') + '</div>';
-      html += row('Model', req.model);
-      html += row('Provider', req.provider);
-      html += row('Status', req.status != null ? req.status : 'streaming...');
-      html += row('Input Tokens', (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens));
-      html += row('Output Tokens', fmtNum(req.output_tokens));
-      html += row('TPS', fmtTps(req.tps));
-      html += row('Duration', fmtDur(req.duration_ms));
-      html += row('TTFT', fmtTTFT(req.ttft_ms, req.time, req.finished));
-      html += row('Request URL', req.request_url);
-      html += row('Target URL', req.target_url);
+      html += detailRow('Model', req.model);
+      html += detailRow('Provider', req.provider);
+      html += detailRow('Status', f.status, 'status');
+      html += detailRow('Input Tokens', f.input, 'input');
+      html += detailRow('Output Tokens', f.output, 'output');
+      html += detailRow('TPS', f.tps, 'tps');
+      html += detailRow('Duration', f.duration, 'duration');
+      html += detailRow('TTFT', f.ttft, 'ttft');
+      html += detailRow('Request URL', req.request_url);
+      html += detailRow('Target URL', req.target_url);
       if (req.request_headers && Object.keys(req.request_headers).length) {
         html += '<details class="detail-section" open><summary>Request Headers</summary>';
         html += '<div class="headers-grid">';
@@ -800,20 +989,42 @@
         if (req.request_body_truncated) html += '<div class="truncated-notice">Truncated at 100KB</div>';
         html += '<div class="body-block">' + esc(prettyJson(req.request_body)) + '</div></details>';
       }
-      if (req.response_headers && Object.keys(req.response_headers).length) {
-        html += '<details class="detail-section" open><summary>Response Headers</summary>';
-        html += '<div class="headers-grid">';
-        for (const [k, v] of Object.entries(req.response_headers)) {
-          html += '<div><span class="hk">' + esc(k) + '</span>: <span class="hv">' + esc(v) + '</span></div>';
-        }
-        html += '</div></details>';
-      }
-      if (req.response_body) {
-        html += '<details class="detail-section" open><summary>Response Body</summary>';
-        if (req.response_body_truncated) html += '<div class="truncated-notice">Truncated at 100KB</div>';
-        html += '<div class="body-block">' + esc(prettyJson(req.response_body)) + '</div></details>';
-      }
+      html += '<details class="detail-section" data-sec="resp-headers" style="display:none"><summary>Response Headers</summary>'
+        + '<div class="headers-grid" data-tt-headers></div></details>';
+      html += '<details class="detail-section" data-sec="resp-body" style="display:none"><summary>Response Body</summary>'
+        + '<div class="truncated-notice" data-tt-resp-trunc style="display:none">Truncated at 100KB</div>'
+        + '<div class="body-block" data-tt-body></div></details>';
       return html;
+    }
+
+    function updatePinnedBodies(req) {
+      const hdrSec = tooltip.querySelector('[data-sec="resp-headers"]');
+      if (hdrSec && !hdrSec.dataset.filled && req.response_headers && Object.keys(req.response_headers).length) {
+        const grid = hdrSec.querySelector('[data-tt-headers]');
+        let h = '';
+        for (const [k, v] of Object.entries(req.response_headers)) {
+          h += '<div><span class="hk">' + esc(k) + '</span>: <span class="hv">' + esc(v) + '</span></div>';
+        }
+        grid.innerHTML = h;
+        hdrSec.dataset.filled = '1';
+        hdrSec.style.display = '';
+      }
+      const bodySec = tooltip.querySelector('[data-sec="resp-body"]');
+      if (bodySec && !bodySec.dataset.filled && req.response_body) {
+        bodySec.querySelector('[data-tt-body]').textContent = prettyJson(req.response_body);
+        if (req.response_body_truncated) bodySec.querySelector('[data-tt-resp-trunc]').style.display = '';
+        bodySec.dataset.filled = '1';
+        bodySec.style.display = '';
+      }
+    }
+
+    function updatePinnedFields(req) {
+      const f = detailFields(req);
+      for (const key of Object.keys(f)) {
+        const el = tooltip.querySelector('[data-tt="' + key + '"]');
+        if (el && el.textContent !== f[key]) el.textContent = f[key];
+      }
+      updatePinnedBodies(req);
     }
 
     function prettyJson(str) {
@@ -822,23 +1033,31 @@
 
     function positionTooltip(e) {
       const pad = 12;
+      const rect = tooltip.getBoundingClientRect();
       let x = e.clientX + pad;
       let y = e.clientY + pad;
-      tooltip.style.left = '0px';
-      tooltip.style.top = '0px';
-      const rect = tooltip.getBoundingClientRect();
       if (x + rect.width > window.innerWidth - pad) x = e.clientX - rect.width - pad;
       if (y + rect.height > window.innerHeight - pad) y = e.clientY - rect.height - pad;
       if (x < pad) x = pad;
       if (y < pad) y = pad;
       tooltip.style.left = x + 'px';
       tooltip.style.top = y + 'px';
+      if (pinnedId) {
+        tooltip.style.maxHeight = Math.max(120, window.innerHeight - y - pad) + 'px';
+      } else {
+        tooltip.style.maxHeight = '';
+      }
     }
 
     function hideTooltip() {
       tooltip.classList.remove('visible');
       tooltip.classList.remove('pinned');
+      pinnedAnchor = null;
     }
+
+    window.addEventListener('resize', () => {
+      if (pinnedId && pinnedAnchor) positionTooltip(pinnedAnchor);
+    });
 
     document.addEventListener('click', e => {
       if (!pinnedId) return;
