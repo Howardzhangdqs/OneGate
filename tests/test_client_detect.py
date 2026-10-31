@@ -57,6 +57,26 @@ def test_gemini_cli_by_ua():
     assert detect_client(H(**{"User-Agent": "gemini-cli/0.1"})) == "gemini-cli"
 
 
+def test_deepseek_harness_by_ua():
+    ua = (
+        "deepseek-harness/0.1.0-rc.6 (+https://github.com/deepseek-ai/deepseek-harness)"
+    )
+    assert detect_client(H(**{"User-Agent": ua})) == "deepseek-harness"
+    assert client_label("deepseek-harness") == "DeepSeek Harness"
+
+
+def test_deepseek_harness_takes_priority_over_stainless():
+    h = H(
+        **{
+            "User-Agent": "deepseek-harness/0.1.0-rc.6",
+            "x-stainless-lang": "js",
+            "x-stainless-os": "Linux",
+            "x-stainless-runtime": "node",
+        }
+    )
+    assert detect_client(h) == "deepseek-harness"
+
+
 def test_claude_code_by_header_fallback():
     assert detect_client(H(**{"anthropic-version": "2023-06-01"})) == "claude-code"
 

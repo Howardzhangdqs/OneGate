@@ -3,20 +3,28 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import json
 import os
 import ssl
 import tempfile
 import time
+import unittest
 
 import aiohttp
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase
 
 from src.admin import create_admin_handlers
-from src.config import AppConfig
+from src.config import AppConfig, load_config
 from src.db import add_token, init_db
-from src.handlers import create_handlers
+from src.handlers import (
+    _apply_privacy_headers,
+    _request_wants_stream,
+    _strip_tracking_body,
+    create_handlers,
+)
 from src.models import Provider, TokenEntry
+from src.usage_monitor import UsageMonitor
 
 
 def _sample_token() -> str:
@@ -82,6 +90,8 @@ class TestHandlers(AioHTTPTestCase):
             _,
             _,
             _,
+            usage_stream_api,
+            usage_sse_handler,
         ) = create_handlers(
             self.cfg,
             self.token_pool,
@@ -89,6 +99,8 @@ class TestHandlers(AioHTTPTestCase):
             self.public_ip,
             self.session,
             time.time(),
+            None,
+            UsageMonitor(self.token_pool),
         )
 
         (
@@ -103,6 +115,8 @@ class TestHandlers(AioHTTPTestCase):
         app = web.Application()
         app.router.add_get("/usage", serve_usage_page)
         app.router.add_post("/usage/api", info_api_handler)
+        app.router.add_post("/usage/api/stream", usage_stream_api)
+        app.router.add_get("/usage/events", usage_sse_handler)
         app.router.add_get("/admin", serve_admin_page)
         app.router.add_get("/admin/api/tokens", api_list_tokens)
         app.router.add_post("/admin/api/tokens", api_create_token)
@@ -116,7 +130,10 @@ class TestHandlers(AioHTTPTestCase):
 
     async def test_info_api_missing_token(self):
         resp = await self.client.post("/usage/api", json={})
-        assert resp.status == 400
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["token"] == ""
+        assert data["limits"] == []
 
     async def test_info_api_invalid_json(self):
         resp = await self.client.post(
@@ -135,6 +152,26 @@ class TestHandlers(AioHTTPTestCase):
         assert resp.status == 200
         data = await resp.json()
         assert data["token"] == _make_token_full()
+
+    async def test_usage_stream_missing_token(self):
+        resp = await self.client.post("/usage/api/stream", json={})
+        assert resp.status == 400
+
+    async def test_usage_stream_unknown_token(self):
+        resp = await self.client.post("/usage/api/stream", json={"token": "unknown"})
+        assert resp.status == 404
+
+    async def test_usage_stream_known_token(self):
+        resp = await self.client.post(
+            "/usage/api/stream", json={"token": _make_token_full()}
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert "session_id" in data
+
+    async def test_usage_sse_invalid_sid(self):
+        resp = await self.client.get("/usage/events?sid=bogus")
+        assert resp.status == 403
 
     async def test_proxy_forbidden_provider(self):
         token = _make_token_full()
@@ -204,6 +241,8 @@ class TestAdminAPI(AioHTTPTestCase):
             serve_usage_page,
             info_api_handler,
             proxy_handler,
+            _,
+            _,
             _,
             _,
             _,
@@ -329,6 +368,297 @@ class TestAdminAPI(AioHTTPTestCase):
         )
         assert resp.status == 200
         assert (await resp.json())["ok"] is True
+
+
+_TRACKING_HEADERS_SENT = {
+    "x-session-id": "sess-1",
+    "x-zcode-trace-id": "trace-1",
+    "x-query-id": "query-1",
+    "x-request-id": "req-1",
+    "x-title": "Z Code@electron",
+    "x-os-category": "linux",
+    "x-os-version": "6.8.0-134-generic",
+    "x-platform": "linux-x64",
+    "x-client-timezone": "Asia/Shanghai",
+    "x-client-language": "en-US",
+    "x-release-channel": "production",
+    "x-zcode-app-version": "3.9.1",
+    "x-zcode-agent": "glm",
+    "x-zcode-session-type": "main",
+    "http-referer": "https://zcode.z.ai",
+    "x-stainless-os": "Linux",
+    "x-stainless-runtime-version": "3.12",
+    "X-Forwarded-For": "10.0.0.1",
+    "X-Real-IP": "10.0.0.1",
+}
+
+_TRACKING_BODY = {
+    "model": "glm-4",
+    "metadata": {"user_id": '{"device_id":"d-1","session_id":"sess-1"}'},
+    "user": "u-1",
+    "messages": [{"role": "user", "content": "hi"}],
+}
+
+
+class TestPrivacyUnits(unittest.TestCase):
+    def test_apply_privacy_headers(self):
+        headers = {
+            "Host": "upstream",
+            "User-Agent": "ZCode/3.9.1 ai-sdk runtime/node.js/22",
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+            "sec-fetch-mode": "cors",
+            "Authorization": "Bearer real",
+            **_TRACKING_HEADERS_SENT,
+        }
+        out = _apply_privacy_headers(headers, "OneGate")
+        assert set(out) == {
+            "Host",
+            "User-Agent",
+            "anthropic-version",
+            "Content-Type",
+            "sec-fetch-mode",
+            "Authorization",
+        }
+        assert out["User-Agent"] == "OneGate"
+        assert out["Authorization"] == "Bearer real"
+
+    def test_apply_privacy_headers_keeps_ua_when_override_empty(self):
+        out = _apply_privacy_headers({"User-Agent": "ZCode/1", "x-title": "t"}, "")
+        assert out == {"User-Agent": "ZCode/1"}
+
+    def test_strip_tracking_body(self):
+        out = json.loads(_strip_tracking_body(json.dumps(_TRACKING_BODY).encode()))
+        assert "metadata" not in out
+        assert "user" not in out
+        assert out["model"] == "glm-4"
+        assert out["messages"] == [{"role": "user", "content": "hi"}]
+
+    def test_strip_tracking_body_passthrough(self):
+        assert _strip_tracking_body(None) is None
+        raw = b"not json"
+        assert _strip_tracking_body(raw) is raw
+        clean = json.dumps({"model": "glm-4"}).encode()
+        assert _strip_tracking_body(clean) is clean
+
+    def test_load_config_privacy(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "config.toml")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write('[privacy]\nstrip_tracking = false\nua_override = "X"\n')
+            cfg = load_config(d)
+            assert cfg.privacy_strip_tracking is False
+            assert cfg.privacy_ua_override == "X"
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("")
+            cfg = load_config(d)
+            assert cfg.privacy_strip_tracking is True
+            assert cfg.privacy_ua_override == ""
+
+
+class TestRequestWantsStream(unittest.TestCase):
+    def test_literal_true(self):
+        assert _request_wants_stream(b'{"model":"m","stream":true}') is True
+
+    def test_stream_false(self):
+        assert _request_wants_stream(b'{"model":"m","stream":false}') is False
+
+    def test_stream_string_is_not_truthy(self):
+        assert _request_wants_stream(b'{"model":"m","stream":"true"}') is False
+
+    def test_missing_stream(self):
+        assert _request_wants_stream(b'{"model":"m"}') is False
+
+    def test_empty_body(self):
+        assert _request_wants_stream(None) is False
+        assert _request_wants_stream(b"") is False
+
+    def test_invalid_json(self):
+        assert _request_wants_stream(b"not json") is False
+
+    def test_non_object_json(self):
+        assert _request_wants_stream(b'["stream", true]') is False
+        assert _request_wants_stream(b"true") is False
+
+
+class TestPrivacyProxyE2E(AioHTTPTestCase):
+    async def get_application(self):
+        self.captured = {}
+
+        async def upstream_handler(request):
+            self.captured["headers"] = dict(request.headers)
+            self.captured["body"] = await request.read()
+            return web.json_response({"ok": True})
+
+        upstream_app = web.Application()
+        upstream_app.router.add_post("/api/messages", upstream_handler)
+        self.upstream_runner = web.AppRunner(upstream_app)
+        await self.upstream_runner.setup()
+        site = web.TCPSite(self.upstream_runner, "127.0.0.1", 0)
+        await site.start()
+        port = self.upstream_runner.addresses[0][1]
+
+        self.cfg = AppConfig(
+            bind_port=0,
+            usage_db=":memory:",
+            providers=[Provider("mock", "/", f"http://127.0.0.1:{port}", False)],
+            real_tokens={"mock": "real-key"},
+        )
+        self.db_conn, _ = init_db(":memory:")
+        self.token = _make_token_full()
+        add_token(self.db_conn, self.token, ["*"])
+        self.token_pool = {self.token: TokenEntry(self.token, ["*"])}
+        self.public_ip = "1.2.3.4"
+
+        timeout = aiohttp.ClientTimeout(total=30, sock_connect=5, sock_read=10)
+        self.session = aiohttp.ClientSession(
+            timeout=timeout,
+            skip_auto_headers={"User-Agent"},
+        )
+
+        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+            self.cfg,
+            self.token_pool,
+            self.db_conn,
+            self.public_ip,
+            self.session,
+            time.time(),
+            None,
+            UsageMonitor(self.token_pool),
+        )
+
+        app = web.Application()
+        app.router.add_route("*", "/{path:.*}", proxy_handler)
+        return app
+
+    async def asyncTearDown(self):
+        await self.session.close()
+        await self.upstream_runner.cleanup()
+
+    async def _post(self):
+        return await self.client.post(
+            "/api/messages",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "User-Agent": "ZCode/3.9.1 ai-sdk runtime/node.js/22",
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+                "sec-fetch-mode": "cors",
+                **_TRACKING_HEADERS_SENT,
+            },
+            json=_TRACKING_BODY,
+        )
+
+    async def test_privacy_strip_on(self):
+        resp = await self._post()
+        assert resp.status == 200
+        h = {k.lower(): v for k, v in self.captured["headers"].items()}
+        assert h.get("user-agent", "").startswith("ZCode/")
+        assert h.get("authorization") == "Bearer real-key"
+        assert h.get("sec-fetch-mode") == "cors"
+        assert h.get("anthropic-version") == "2023-06-01"
+        for banned in (k.lower() for k in _TRACKING_HEADERS_SENT):
+            assert banned not in h
+        body = json.loads(self.captured["body"])
+        assert "metadata" not in body
+        assert "user" not in body
+        assert body["model"] == "glm-4"
+
+    async def test_privacy_strip_off(self):
+        self.cfg.privacy_strip_tracking = False
+        resp = await self._post()
+        assert resp.status == 200
+        h = {k.lower(): v for k, v in self.captured["headers"].items()}
+        assert h.get("x-session-id") == "sess-1"
+        assert h.get("user-agent", "").startswith("ZCode/")
+        assert h.get("x-forwarded-for") == "10.0.0.1, 1.2.3.4"
+        assert h.get("x-real-ip") == "1.2.3.4"
+        body = json.loads(self.captured["body"])
+        assert body["metadata"]["user_id"].startswith('{"device_id"')
+        assert body["user"] == "u-1"
+
+
+class TestStreamAcceptEncodingProxy(AioHTTPTestCase):
+    async def get_application(self):
+        self.captured = {}
+
+        async def upstream_handler(request):
+            self.captured["headers"] = dict(request.headers)
+            self.captured["body"] = await request.read()
+            return web.json_response({"ok": True})
+
+        upstream_app = web.Application()
+        upstream_app.router.add_post("/api/chat", upstream_handler)
+        self.upstream_runner = web.AppRunner(upstream_app)
+        await self.upstream_runner.setup()
+        site = web.TCPSite(self.upstream_runner, "127.0.0.1", 0)
+        await site.start()
+        port = self.upstream_runner.addresses[0][1]
+
+        self.cfg = AppConfig(
+            bind_port=0,
+            usage_db=":memory:",
+            providers=[Provider("mock", "/", f"http://127.0.0.1:{port}", False)],
+            real_tokens={"mock": "real-key"},
+        )
+        self.db_conn, _ = init_db(":memory:")
+        self.token = _make_token_full()
+        add_token(self.db_conn, self.token, ["*"])
+        self.token_pool = {self.token: TokenEntry(self.token, ["*"])}
+        self.public_ip = "1.2.3.4"
+
+        timeout = aiohttp.ClientTimeout(total=30, sock_connect=5, sock_read=10)
+        self.session = aiohttp.ClientSession(
+            timeout=timeout,
+            skip_auto_headers={"User-Agent"},
+        )
+
+        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+            self.cfg,
+            self.token_pool,
+            self.db_conn,
+            self.public_ip,
+            self.session,
+            time.time(),
+        )
+
+        app = web.Application()
+        app.router.add_route("*", "/{path:.*}", proxy_handler)
+        return app
+
+    async def asyncTearDown(self):
+        await self.session.close()
+        await self.upstream_runner.cleanup()
+
+    async def _post(self, payload):
+        return await self.client.post(
+            "/api/chat",
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Accept-Encoding": "gzip",
+            },
+            json=payload,
+        )
+
+    async def test_stream_request_forces_identity_encoding(self):
+        resp = await self._post(
+            {
+                "model": "deepseek-reasoner",
+                "stream": True,
+                "messages": [{"role": "user", "content": "hi"}],
+            }
+        )
+        assert resp.status == 200
+        h = {k.lower(): v for k, v in self.captured["headers"].items()}
+        assert h.get("accept-encoding") == "identity"
+
+    async def test_non_stream_request_preserves_accept_encoding(self):
+        resp = await self._post(
+            {"model": "deepseek-chat", "messages": [{"role": "user", "content": "hi"}]}
+        )
+        assert resp.status == 200
+        h = {k.lower(): v for k, v in self.captured["headers"].items()}
+        assert h.get("accept-encoding") == "gzip"
 
 
 if __name__ == "__main__":

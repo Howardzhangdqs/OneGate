@@ -5,15 +5,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.db import (
+    compute_cost,
+    delete_pricing,
+    get_all_pricing,
     get_client_usage_detail,
     get_client_usage_summary,
     get_global_client_hourly,
     get_global_client_summary,
+    get_pricing_map,
+    get_token_client_hourly,
     get_token_client_usage_detail,
     get_token_clients,
+    get_token_usage_by_model,
     init_db,
     record_client_token_usage,
     record_client_usage,
+    record_token_usage,
+    set_pricing,
 )
 
 
@@ -192,3 +200,108 @@ def test_get_token_client_usage_detail_separates_clients():
     assert detail["claude-code"]["cache_read"] == 80
     assert detail["codex"]["requests"] == 1
     assert detail["codex"]["input"] == 0
+
+
+def test_get_token_client_hourly_groups_by_client_and_hour():
+    conn = _conn()
+    record_client_usage(conn, "tokH", "glm", "claude-code")
+    record_client_token_usage(conn, "tokH", "glm", "claude-code", 100, 50, 80, 10)
+    hourly = get_token_client_hourly(
+        conn, "tokH", int(time.time()) - 3600, int(time.time()) + 3600
+    )
+    assert "claude-code" in hourly
+    slots = hourly["claude-code"]
+    assert len(slots) == 1
+    slot = next(iter(slots.values()))
+    assert slot["requests"] == 1
+    assert slot["input"] == 100
+    assert slot["output"] == 50
+    assert slot["cache_read"] == 80
+    assert slot["cache_write"] == 10
+
+
+def test_get_token_client_hourly_separates_clients():
+    conn = _conn()
+    record_client_usage(conn, "tokH2", "glm", "claude-code")
+    record_client_usage(conn, "tokH2", "glm", "codex")
+    record_client_token_usage(conn, "tokH2", "glm", "claude-code", 100, 50, 80, 0)
+    hourly = get_token_client_hourly(
+        conn, "tokH2", int(time.time()) - 3600, int(time.time()) + 3600
+    )
+    assert "claude-code" in hourly
+    assert "codex" in hourly
+    claude_slot = next(iter(hourly["claude-code"].values()))
+    assert claude_slot["input"] == 100
+    codex_slot = next(iter(hourly["codex"].values()))
+    assert codex_slot["requests"] == 1
+    assert codex_slot["input"] == 0
+
+
+def test_get_token_client_hourly_scoped_to_token():
+    conn = _conn()
+    record_client_usage(conn, "tokOwner", "glm", "claude-code")
+    record_client_usage(conn, "tokOther", "glm", "claude-code")
+    hourly = get_token_client_hourly(
+        conn, "tokOwner", int(time.time()) - 3600, int(time.time()) + 3600
+    )
+    slot = next(iter(hourly["claude-code"].values()))
+    assert slot["requests"] == 1
+
+
+def test_usage_recorded_with_model_breaks_down_by_model():
+    conn = _conn()
+    record_token_usage(
+        conn,
+        "tokM",
+        "deepseek",
+        input_tokens=1000,
+        output_tokens=500,
+        model="deepseek-v4-flash",
+    )
+    record_token_usage(
+        conn,
+        "tokM",
+        "deepseek",
+        input_tokens=200,
+        output_tokens=100,
+        model="deepseek-v4-pro",
+    )
+    record_token_usage(
+        conn, "tokM", "deepseek", input_tokens=50, output_tokens=10, model=""
+    )
+    by_model = get_token_usage_by_model(
+        conn, "tokM", int(time.time()) - 3600, int(time.time()) + 3600
+    )
+    assert by_model["deepseek-v4-flash"]["input"] == 1000
+    assert by_model["deepseek-v4-flash"]["output"] == 500
+    assert by_model["deepseek-v4-pro"]["input"] == 200
+    assert by_model[""]["input"] == 50
+
+
+def test_pricing_crud_and_cost():
+    conn = _conn()
+    # seeded defaults exist
+    pricing = get_all_pricing(conn)
+    models = {p["model"] for p in pricing}
+    assert "deepseek-v4-flash" in models
+    assert "deepseek-v4-pro" in models
+
+    set_pricing(conn, "gpt-test", 1.0, 2.0, 3.0, 4.0)
+    pmap = get_pricing_map(conn)
+    assert pmap["gpt-test"]["input_cache_hit"] == 1.0
+    assert pmap["gpt-test"]["output_cache_miss"] == 4.0
+
+    row = {
+        "input": 2_000_000,
+        "output": 1_000_000,
+        "cache_read": 500_000,
+        "cache_write": 0,
+    }
+    cost = compute_cost(row, pmap["gpt-test"])
+    # input is net (excludes cache_read): 2M*2 + 0.5M*1 + (1M - 0)*4 + 0*3
+    # = 4M + 0.5M + 4M = 8.5 元
+    assert abs(cost - 8.5) < 1e-9
+
+    assert delete_pricing(conn, "gpt-test") is True
+    assert delete_pricing(conn, "gpt-test") is False
+    assert "gpt-test" not in get_pricing_map(conn)

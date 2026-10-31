@@ -10,16 +10,21 @@ import tempfile
 from src.config import load_config, match_provider
 from src.db import (
     add_token,
+    check_rate_limit,
     delete_token,
     get_all_tokens,
+    get_rate_limit_status,
     get_token,
     init_db,
     is_admin_token,
+    record_success,
+    record_token_usage,
     record_usage,
     update_token,
 )
 from src.models import Provider, TokenEntry
 from src.pool import extract_token, load_pool_from_db, make_token, resolve_token
+from src.admin import _read_limit, _read_limit_opt
 
 
 def _sample_token() -> str:
@@ -75,7 +80,29 @@ def test_token_entry_disabled():
 
 
 def test_token_entry_to_from_db():
-    entry = TokenEntry("abc.def", ["glm"], is_admin=True, enabled=True, created_at=1000)
+    entry = TokenEntry(
+        "abc.def",
+        ["glm"],
+        is_admin=True,
+        enabled=True,
+        created_at=1000,
+        rpm=10,
+        rph=100,
+        rpd=1000,
+        rpw=7000,
+        rpmo=30000,
+        rpt=99999,
+        tpm=5_000_000,
+        tph=50_000_000,
+        tpd=500_000_000,
+        tpw=3_500_000_000,
+        tpmo=15_000_000_000,
+        tpt=99_999_999,
+        success_count=42,
+        token_count=123_456,
+        cache_read_weight=0.1,
+        cache_write_weight=1.25,
+    )
     row = entry.to_db_row()
     assert row[0] == "abc.def"
     assert json.loads(row[1]) == ["glm"]
@@ -89,6 +116,22 @@ def test_token_entry_to_from_db():
     assert restored.is_admin is True
     assert restored.enabled is True
     assert restored.created_at == 1000
+    assert restored.rpm == 10
+    assert restored.rpt == 99999
+    assert restored.rpw == 7000
+    assert restored.rpmo == 30000
+    assert restored.tpm == 5_000_000
+    assert restored.tpt == 99_999_999
+    assert restored.token_count == 123_456
+    assert restored.cache_read_weight == 0.1
+    assert restored.cache_write_weight == 1.25
+    assert restored.has_limits is True
+
+
+def test_token_entry_has_limits_default():
+    entry = TokenEntry("abc.def", ["*"])
+    assert entry.has_limits is False
+    assert all(getattr(entry, f) == -1 for f in TokenEntry.RATE_LIMIT_FIELDS)
 
 
 def test_match_provider_exact_prefix():
@@ -114,6 +157,23 @@ def test_match_provider_longest_prefix():
     assert match_provider(providers, "/oai/chat/completions").name == "oai-chat"
     assert match_provider(providers, "/oai/v1/models").name == "oai"
     assert match_provider(providers, "/other/path").name == "default"
+
+
+def test_match_provider_multi_segment_prefix():
+    providers = [
+        Provider("default", "/", "https://open.bigmodel.cn", False),
+        Provider("gjzq-glm", "/gjzq/glm", "https://gpt.example.cn/prod-api", True),
+        Provider("gjzq-ds", "/gjzq/ds", "https://gpt.example.cn/prod-api", True),
+    ]
+    assert match_provider(providers, "/gjzq/glm/v1/chat/completions").name == "gjzq-glm"
+    assert match_provider(providers, "/gjzq/ds/v1/chat/completions").name == "gjzq-ds"
+    assert match_provider(providers, "/gjzq/glmx/v1/chat").name == "default"
+    assert match_provider(providers, "/gjzq").name == "default"
+
+    p = match_provider(providers, "/gjzq/glm/v1/chat/completions")
+    prefix = p.prefix.rstrip("/")
+    assert "/gjzq/glm/v1/chat/completions"[len(prefix) :] == "/v1/chat/completions"
+    assert p.origin + p.upstream_path == "https://gpt.example.cn/prod-api"
 
 
 def test_match_provider_no_providers():
@@ -259,6 +319,137 @@ def test_record_usage():
         os.unlink(db_file)
 
 
+def test_record_token_usage_tracks_rate_buckets():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_file = f.name
+    try:
+        conn, _ = init_db(db_file)
+        add_token(conn, "tok.rate", ["*"])
+        record_token_usage(conn, "tok.rate", "glm", input_tokens=300, output_tokens=200)
+        row = conn.execute(
+            "SELECT tokens FROM token_rate_usage WHERE token=?", ("tok.rate",)
+        ).fetchone()
+        assert row[0] == 500
+        tc = conn.execute(
+            "SELECT token_count FROM token_pool WHERE token=?", ("tok.rate",)
+        ).fetchone()
+        assert tc[0] == 500
+        conn.close()
+    finally:
+        os.unlink(db_file)
+
+
+def test_record_token_usage_with_cache_weights():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_file = f.name
+    try:
+        conn, _ = init_db(db_file)
+        add_token(conn, "tok.cw", ["*"])
+        # input 300 + output 200 + 0.1*cache_read 1000 + 1.25*cache_write 400
+        # = 500 + 100 + 500 = 1100
+        record_token_usage(
+            conn,
+            "tok.cw",
+            "glm",
+            input_tokens=300,
+            output_tokens=200,
+            cache_read=1000,
+            cache_write=400,
+            cache_read_weight=0.1,
+            cache_write_weight=1.25,
+        )
+        row = conn.execute(
+            "SELECT tokens FROM token_rate_usage WHERE token=?", ("tok.cw",)
+        ).fetchone()
+        assert row[0] == 1100
+        # zero weights (default) -> cache ignored, only input+output
+        record_token_usage(
+            conn,
+            "tok.cw",
+            "glm",
+            input_tokens=10,
+            output_tokens=5,
+            cache_read=9999,
+            cache_write=9999,
+        )
+        row = conn.execute(
+            "SELECT tokens FROM token_rate_usage WHERE token=?", ("tok.cw",)
+        ).fetchone()
+        assert row[0] == 1100 + 15
+        conn.close()
+    finally:
+        os.unlink(db_file)
+
+
+def test_check_rate_limit_blocks_and_reports():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_file = f.name
+    try:
+        conn, _ = init_db(db_file)
+        entry = add_token(conn, "tok.lim", ["*"], rpm=2, tpm=1_000_000)
+        allowed, triggered, quota = check_rate_limit(conn, entry)
+        assert allowed is True
+        assert triggered is None
+        assert "rpm" in quota and "tpm" in quota
+        record_success(conn, "tok.lim", "glm")
+        record_success(conn, "tok.lim", "glm")
+        record_token_usage(
+            conn, "tok.lim", "glm", input_tokens=400_000, output_tokens=400_000
+        )
+        allowed, triggered, quota = check_rate_limit(conn, entry)
+        assert allowed is False
+        assert triggered == "rpm"
+        assert "rpm" in quota and "tpm" in quota
+        assert quota["rpm"]["used"] == 2
+        assert quota["tpm"]["limit"] == 1
+        assert quota["tpm"]["used"] == 0.8
+        conn.close()
+    finally:
+        os.unlink(db_file)
+
+
+def test_get_rate_limit_status_only_configured():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_file = f.name
+    try:
+        conn, _ = init_db(db_file)
+        entry = add_token(conn, "tok.status", ["*"], rph=10, tph=2_000_000)
+        status = get_rate_limit_status(conn, entry)
+        keys = {d["key"] for d in status}
+        assert keys == {"rph", "tph"}
+        by_key = {d["key"]: d for d in status}
+        assert by_key["rph"]["limit"] == 10
+        assert by_key["tph"]["limit"] == 2
+        assert by_key["tph"]["unit"] == "M tokens"
+        unlimited = add_token(conn, "tok.free", ["*"])
+        assert get_rate_limit_status(conn, unlimited) == []
+        conn.close()
+    finally:
+        os.unlink(db_file)
+
+
+def test_read_limit_scales_tokens_in_millions():
+    assert _read_limit({"rpm": 10}, "rpm") == 10
+    assert _read_limit({"tpm": 5}, "tpm") == 5_000_000
+    assert _read_limit({"tpm": 0.5}, "tpm") == 500_000
+    assert _read_limit({"tpm": -1}, "tpm") == -1
+    assert _read_limit({}, "tpm") == -1
+    assert _read_limit({"tpt": ""}, "tpt") == -1
+    assert _read_limit_opt({}, "tpm") is None
+    assert _read_limit_opt({"tpm": 3}, "tpm") == 3_000_000
+
+
+def test_read_weight_parses_floats():
+    from src.admin import _read_weight, _read_weight_opt
+
+    assert _read_weight({"cache_read_weight": 0.1}, "cache_read_weight") == 0.1
+    assert _read_weight({"cache_write_weight": "1.25"}, "cache_write_weight") == 1.25
+    assert _read_weight({}, "cache_read_weight") == -1
+    assert _read_weight({"cache_read_weight": ""}, "cache_read_weight") == -1
+    assert _read_weight_opt({}, "cache_read_weight") is None
+    assert _read_weight_opt({"cache_read_weight": 0}, "cache_read_weight") == 0.0
+
+
 def test_db_token_crud():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_file = f.name
@@ -342,6 +533,8 @@ count = 10
 file = "test_pool.json"
 usage_db = "test_usage.db"
 admin_tokens = ["aaa", "bbb"]
+cache_read_weight = 0.1
+cache_write_weight = 1.25
 
 [providers.test1]
 prefix = "/t1"
@@ -361,6 +554,8 @@ strip_prefix = false
         assert cfg.enable_log is True
         assert cfg.pool_count == 10
         assert cfg.admin_tokens == ["aaa", "bbb"]
+        assert cfg.cache_read_weight == 0.1
+        assert cfg.cache_write_weight == 1.25
         assert len(cfg.providers) == 2
         by_name = {p.name: p for p in cfg.providers}
         assert by_name["test1"].env_token == "MY_TOKEN_TEST1"
