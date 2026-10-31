@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Pricing</title>
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
+  <style>
+    .container { max-width: 1000px }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #30363d;
+      border-radius: 8px
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: right;
+      white-space: nowrap
+    }
+
+    th:first-child { text-align: left }
+
+    td {
+      padding: 8px 14px;
+      vertical-align: middle;
+      text-align: right;
+      font-variant-numeric: tabular-nums
+    }
+
+    td:first-child { text-align: left }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px
+    }
+
+    .toolbar h2 {
+      font-size: 14px;
+      color: #8b949e
+    }
+
+    .unit-hint {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 2px
+    }
+
+    .price-cell {
+      font-size: 13px;
+      color: #c9d1d9
+    }
+
+    .price-input {
+      width: 96px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      text-align: right
+    }
+
+    .price-input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .model-input {
+      width: 200px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--font-all)
+    }
+
+    .model-input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .model-cell {
+      font-family: var(--font-all);
+      color: #79c0ff;
+      font-size: 13px
+    }
+
+    .row-new td { background: #0d1117 }
+
+    .actions { white-space: nowrap }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      background: #0d1117
+    }
+
+    .badge.admin {
+      border-color: #a371f7;
+      color: #a371f7;
+      background: #1f1035
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: opacity .3s, transform .3s;
+      max-width: 400px;
+      word-break: break-word
+    }
+
+    .toast.show { opacity: 1; transform: translateX(0) }
+    .toast-error { background: #da3633; border: 1px solid #f85149 }
+    .toast-success { background: #238636; border: 1px solid #2ea043 }
+
+    .login-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.active { display: flex }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 400px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group { margin-bottom: 16px }
+
+    .login-box .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      letter-spacing: .5px
+    }
+
+    .login-box .form-group input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: var(--font-all)
+    }
+
+    .login-box .form-group input:focus {
+      outline: none;
+      border-color: #58a6ff
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input { accent-color: #238636 }
+
+    .login-hint {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 14px;
+      line-height: 1.5
+    }
+  </style>
+</head>
+
+<body>
+  <div id="og-header"></div>
+  <script>
+    OneGateHeader.mount('#og-header', {
+      active: 'pricing',
+      title: 'Model Pricing',
+      actions: '<span class="badge" id="role-badge">View only</span><button class="btn btn-sm" id="login-btn" onclick="showLogin()">Login as admin</button><button class="btn btn-sm" id="logout-btn" style="display:none" onclick="doLogout()">Logout</button>'
+    });
+  </script>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <div class="form-group">
+        <label>Admin Token</label>
+        <input type="text" id="login-token" placeholder="enter admin token to edit...">
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <div class="error-msg" id="login-error"></div>
+      <div class="login-hint">Without login you can still <a href="#" onclick="loadReadOnly();return false" style="color:#58a6ff">view pricing read-only</a>.</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="toolbar">
+      <div>
+        <h2 id="pricing-count">Pricing</h2>
+        <div class="unit-hint">All prices in 元 / million tokens</div>
+      </div>
+      <div id="add-wrap" style="display:none">
+        <button class="btn btn-primary" onclick="addRow()">+ Add Model</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>输入 (缓存命中)</th>
+            <th>输入 (缓存未命中)</th>
+            <th>输出 (缓存命中)</th>
+            <th>输出 (缓存未命中)</th>
+            <th class="actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pricing-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let isAdmin = false;
+    let adminToken = null;
+    let pricingData = [];
+
+    function toast(msg, type) {
+      type = type || 'error';
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + type;
+      el.textContent = msg;
+      document.getElementById('toast-container').appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (adminToken) opts.headers['X-Admin-Token'] = adminToken;
+      if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
+      const resp = await fetch(path, opts);
+      const data = await resp.json();
+      return { ok: resp.ok, status: resp.status, data };
+    }
+
+    async function loadPricing() {
+      const { ok, data } = await api('GET', '/pricing/api');
+      if (!ok) { toast(data.error || 'Failed to load'); return; }
+      isAdmin = !!data.is_admin;
+      pricingData = data.pricing || [];
+      renderRole();
+      render();
+    }
+
+    async function loadReadOnly() {
+      hideLogin();
+      await loadPricing();
+    }
+
+    function renderRole() {
+      const badge = document.getElementById('role-badge');
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+      const addWrap = document.getElementById('add-wrap');
+      if (isAdmin) {
+        badge.textContent = 'Admin';
+        badge.classList.add('admin');
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = '';
+        addWrap.style.display = '';
+      } else {
+        badge.textContent = 'View only';
+        badge.classList.remove('admin');
+        loginBtn.style.display = '';
+        logoutBtn.style.display = 'none';
+        addWrap.style.display = 'none';
+      }
+      document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+    }
+
+    function fmtPrice(v) {
+      const n = Number(v);
+      if (!isFinite(n)) return '0';
+      if (Number.isInteger(n)) return String(n);
+      return n.toFixed(4).replace(/\.?0+$/, '');
+    }
+
+    function render() {
+      const tbody = document.getElementById('pricing-body');
+      const rows = pricingData.map((p, i) => {
+        if (isAdmin) {
+          return `<tr data-i="${i}">
+            <td><input class="model-input" data-field="model" value="${esc(p.model)}"></td>
+            <td><input class="price-input" data-field="input_cache_hit" type="number" step="any" min="0" value="${fmtPrice(p.input_cache_hit)}"></td>
+            <td><input class="price-input" data-field="input_cache_miss" type="number" step="any" min="0" value="${fmtPrice(p.input_cache_miss)}"></td>
+            <td><input class="price-input" data-field="output_cache_hit" type="number" step="any" min="0" value="${fmtPrice(p.output_cache_hit)}"></td>
+            <td><input class="price-input" data-field="output_cache_miss" type="number" step="any" min="0" value="${fmtPrice(p.output_cache_miss)}"></td>
+            <td class="actions">
+              <button class="btn btn-sm btn-primary" onclick="saveRow(${i})">Save</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteRow(${i})">Delete</button>
+            </td>
+          </tr>`;
+        }
+        return `<tr>
+          <td class="model-cell">${esc(p.model)}</td>
+          <td class="price-cell">${fmtPrice(p.input_cache_hit)}</td>
+          <td class="price-cell">${fmtPrice(p.input_cache_miss)}</td>
+          <td class="price-cell">${fmtPrice(p.output_cache_hit)}</td>
+          <td class="price-cell">${fmtPrice(p.output_cache_miss)}</td>
+          <td class="actions" style="color:#484f58">—</td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = rows;
+    }
+
+    function addRow() {
+      pricingData.push({
+        model: '',
+        input_cache_hit: 0,
+        input_cache_miss: 0,
+        output_cache_hit: 0,
+        output_cache_miss: 0,
+      });
+      render();
+      const tbody = document.getElementById('pricing-body');
+      const last = tbody.lastElementChild;
+      if (last) {
+        last.classList.add('row-new');
+        const inp = last.querySelector('.model-input');
+        if (inp) inp.focus();
+      }
+      document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+    }
+
+    function readRow(i) {
+      const tr = document.querySelector(`tr[data-i="${i}"]`);
+      if (!tr) return null;
+      const get = f => tr.querySelector(`[data-field="${f}"]`).value;
+      return {
+        model: get('model').trim(),
+        input_cache_hit: parseFloat(get('input_cache_hit')),
+        input_cache_miss: parseFloat(get('input_cache_miss')),
+        output_cache_hit: parseFloat(get('output_cache_hit')),
+        output_cache_miss: parseFloat(get('output_cache_miss')),
+      };
+    }
+
+    async function saveRow(i) {
+      const row = readRow(i);
+      if (!row) return;
+      if (!row.model) { toast('Model is required'); return; }
+      for (const k of ['input_cache_hit', 'input_cache_miss', 'output_cache_hit', 'output_cache_miss']) {
+        if (!isFinite(row[k]) || row[k] < 0) { toast('Prices must be non-negative numbers'); return; }
+      }
+      const { ok, data } = await api('POST', '/pricing/api', row);
+      if (!ok) { toast(data.error || 'Save failed'); return; }
+      toast('Saved', 'success');
+      await loadPricing();
+    }
+
+    async function deleteRow(i) {
+      const model = pricingData[i] && pricingData[i].model;
+      if (!model) {
+        pricingData.splice(i, 1);
+        render();
+        document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+        return;
+      }
+      const { ok, data } = await api('DELETE', '/pricing/api', { model });
+      if (!ok) { toast(data.error || 'Delete failed'); return; }
+      toast('Deleted', 'success');
+      await loadPricing();
+    }
+
+    function showLogin() {
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('login-overlay').classList.add('active');
+      document.getElementById('login-token').focus();
+    }
+
+    function hideLogin() {
+      document.getElementById('login-overlay').classList.remove('active');
+    }
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      if (!token) { document.getElementById('login-error').textContent = 'Please enter a token'; return; }
+      document.getElementById('login-error').textContent = '';
+      adminToken = token;
+      const { ok, data } = await api('GET', '/pricing/api');
+      if (!ok || !data.is_admin) {
+        adminToken = null;
+        document.getElementById('login-error').textContent = 'Invalid or non-admin token';
+        return;
+      }
+      if (document.getElementById('login-remember').checked) {
+        localStorage.setItem('admin_token', token);
+      }
+      hideLogin();
+      await loadPricing();
+    }
+
+    function doLogout() {
+      adminToken = null;
+      localStorage.removeItem('admin_token');
+      document.getElementById('login-token').value = '';
+      loadPricing();
+    }
+
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+    document.getElementById('login-overlay').addEventListener('click', function (e) {
+      if (e.target === this) hideLogin();
+    });
+
+    (function init() {
+      const saved = localStorage.getItem('admin_token');
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        adminToken = saved;
+      }
+      loadPricing();
+    })();
+  </script>
+</body>
+
+</html>

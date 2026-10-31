@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Catalog</title>
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
+  <style>
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px
+    }
+
+    .toolbar h2 {
+      font-size: 14px;
+      color: #8b949e;
+      font-weight: 400;
+      letter-spacing: .3px
+    }
+
+    .toolbar h2 .count-on {
+      color: #3fb950;
+      font-weight: 600
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px
+    }
+
+    .callout {
+      display: flex;
+      gap: 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-left: 3px solid #1f6feb;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 12.5px;
+      color: #8b949e;
+      line-height: 1.7
+    }
+
+    .callout-icon {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      border-radius: 50%;
+      border: 1px solid #1f6feb;
+      color: #58a6ff;
+      font-size: 11px;
+      font-style: normal;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .callout strong {
+      color: #c9d1d9;
+      font-weight: 600
+    }
+
+    .callout code {
+      background: #1c2128;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11.5px;
+      color: #f0883e
+    }
+
+    .callout a {
+      color: #58a6ff;
+      text-decoration: none
+    }
+
+    .callout a:hover {
+      text-decoration: underline
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #30363d;
+      border-radius: 8px
+    }
+
+    table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: center;
+      white-space: nowrap
+    }
+
+    td {
+      padding: 9px 14px;
+      vertical-align: middle;
+      text-align: center
+    }
+
+    .model-cell {
+      text-align: left;
+      font-family: var(--font-all);
+      font-size: 13px;
+      color: #79c0ff;
+      word-break: break-all
+    }
+
+    .model-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .model-line>span:first-child {
+      word-break: break-all
+    }
+
+    .pattern-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px dashed rgba(210, 153, 34, .5);
+      background: rgba(210, 153, 34, .1);
+      color: #d29922;
+      font-family: var(--font-all);
+      font-size: 10px;
+      line-height: 1.6;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+      cursor: help
+    }
+
+    .pattern-badge::before {
+      content: ".*";
+      letter-spacing: -1px;
+      opacity: .85
+    }
+
+    .pattern-badge[hidden] {
+      display: none
+    }
+
+    .form-group>label .pattern-badge {
+      margin-left: 6px;
+      vertical-align: 1px
+    }
+
+    .hint code {
+      background: #1c2128;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      padding: 0 4px;
+      font-size: 10.5px;
+      color: #f0883e;
+      font-family: var(--font-all);
+      white-space: nowrap
+    }
+
+    .upstream-cell {
+      text-align: left;
+      font-family: var(--font-all);
+      font-size: 13px;
+      word-break: break-all
+    }
+
+    .target-cell {
+      color: #3fb950
+    }
+
+    .muted {
+      color: #8b949e;
+      font-size: 12px
+    }
+
+    .prov-tag {
+      background: rgba(31, 111, 235, .12);
+      border-color: rgba(31, 111, 235, .4);
+      color: #58a6ff
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0
+    }
+
+    .toggle .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #30363d;
+      transition: .2s;
+      border-radius: 20px
+    }
+
+    .toggle .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background: #8b949e;
+      transition: .2s;
+      border-radius: 50%
+    }
+
+    .toggle input:checked+.slider {
+      background: #238636
+    }
+
+    .toggle input:checked+.slider:before {
+      transform: translateX(16px);
+      background: #fff
+    }
+
+    .toggle input:disabled+.slider {
+      opacity: .5;
+      cursor: default
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 100;
+      justify-content: center;
+      align-items: center
+    }
+
+    .modal-overlay.active {
+      display: flex
+    }
+
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      width: 440px;
+      max-width: 92vw;
+      max-height: 92vh;
+      overflow-y: auto
+    }
+
+    .modal h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #c9d1d9
+    }
+
+    .form-group {
+      margin-bottom: 14px
+    }
+
+    .form-group>label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      letter-spacing: .5px
+    }
+
+    .form-group input[type=text],
+    .form-group select {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--font-all)
+    }
+
+    .form-group input[type=text]:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 2px rgba(88, 166, 255, .12)
+    }
+
+    .form-group select:disabled {
+      color: #6e7681;
+      cursor: not-allowed
+    }
+
+    .form-group .hint {
+      font-size: 11px;
+      color: #6e7681;
+      margin-top: 5px;
+      line-height: 1.5
+    }
+
+    .optional {
+      color: #6e7681;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      margin-left: 4px
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 9px 12px;
+      margin-bottom: 10px
+    }
+
+    .toggle-row .tr-label {
+      font-size: 13px;
+      color: #c9d1d9
+    }
+
+    .toggle-row .tr-hint {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 2px
+    }
+
+    .modal-error {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 16px;
+      margin-bottom: 4px
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 12px
+    }
+
+    .confirm-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, .6);
+      z-index: 300;
+      justify-content: center;
+      align-items: center
+    }
+
+    .confirm-overlay.active {
+      display: flex
+    }
+
+    .confirm-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      width: 360px;
+      max-width: 90vw
+    }
+
+    .confirm-box p {
+      font-size: 14px;
+      color: #c9d1d9;
+      margin-bottom: 20px;
+      word-break: break-all
+    }
+
+    .confirm-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: opacity .3s, transform .3s;
+      max-width: 400px;
+      word-break: break-word
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0)
+    }
+
+    .toast-error {
+      background: #da3633;
+      border: 1px solid #f85149
+    }
+
+    .toast-success {
+      background: #238636;
+      border: 1px solid #2ea043
+    }
+
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0d1117;
+      z-index: 400;
+      justify-content: center;
+      align-items: center
+    }
+
+    .login-overlay.hidden {
+      display: none
+    }
+
+    .login-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 400px;
+      max-width: 90vw
+    }
+
+    .login-box h2 {
+      font-size: 20px;
+      color: #58a6ff;
+      margin-bottom: 20px
+    }
+
+    .login-box .form-group {
+      margin-bottom: 16px
+    }
+
+    .login-box .form-group label {
+      display: block;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      letter-spacing: .5px
+    }
+
+    .login-box .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      border-radius: 6px;
+      font-family: var(--font-all)
+    }
+
+    .login-box .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      min-height: 18px;
+      margin-top: 8px
+    }
+
+    .login-box .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer
+    }
+
+    .login-box .remember-row input {
+      accent-color: #238636
+    }
+
+    .catalog-content {
+      display: none
+    }
+
+    .catalog-content.active {
+      display: block
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <div class="form-group">
+        <label>Admin Token</label>
+        <input type="text" id="login-token" placeholder="enter admin token..." autofocus>
+      </div>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+
+  <div class="catalog-content" id="catalog-content">
+    <div id="og-header"></div>
+    <script>
+      OneGateHeader.mount('#og-header', {
+        active: 'models',
+        title: 'Model Catalog',
+        actions: '<div class="info" id="stats"></div><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+      });
+    </script>
+
+    <div class="container">
+      <div class="toolbar">
+        <h2 id="model-count">Models</h2>
+        <div class="toolbar-actions">
+          <button class="btn" onclick="loadModels()">Refresh</button>
+          <button class="btn btn-primary" onclick="showAddModal()">+ Add Model</button>
+        </div>
+      </div>
+
+      <div class="callout">
+        <i class="callout-icon" aria-hidden="true">i</i>
+        <div>
+          <strong>How the catalog works.</strong> Clients call <code>GET /v1/models</code> with their proxy token and
+          receive the ids they are allowed to see. A chat or Responses request that uses one of those ids is forwarded
+          to the provider and upstream model set here. Which ids each token can see is managed in
+          <a href="/admin">Admin</a> &rarr; Tokens &rarr; Visible models.
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30%">Public model</th>
+              <th style="width:15%">Provider</th>
+              <th style="width:27%">Upstream model</th>
+              <th style="width:12%">Status</th>
+              <th style="width:16%" class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="model-tbody">
+            <tr>
+              <td colspan="5" class="empty">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <h3 id="modal-title">Add Model</h3>
+        <div class="form-group">
+          <label for="modal-model">Model id or pattern <span class="pattern-badge" id="modal-pattern-badge" title="This entry is stored as a pattern rule" hidden>Pattern</span></label>
+          <input type="text" id="modal-model" placeholder="glm-5.3 / glm-* / ^claude-(.+)$" autocomplete="off" spellcheck="false">
+          <div class="hint">
+            Exact ids match first, then longer patterns before shorter ones. An entry containing
+            <code>* ? [ ] ( ) { } ^ $ | \ +</code> is a pattern: it is tried as a regex (full match), then as a
+            wildcard such as <code>glm-*</code>; invalid regex is ignored and the wildcard is used. Patterns route
+            requests but are not returned by <code>/v1/models</code>.
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="modal-provider">Provider</label>
+          <select id="modal-provider"></select>
+          <div class="hint">Requests matching this id are forwarded to the selected provider.</div>
+        </div>
+        <div class="form-group">
+          <label for="modal-target">Upstream model <span class="optional">optional</span></label>
+          <input type="text" id="modal-target" placeholder="e.g. glm-5.3 or glm-$1" autocomplete="off" spellcheck="false">
+          <div class="hint">Use <code>$1</code> <code>$2</code> … to insert regex capture groups. Leave empty to forward
+            the requested model name unchanged.</div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="tr-label">Enabled</div>
+            <div class="tr-hint">Disabled models are hidden from /v1/models.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="modal-enabled" aria-label="Enabled" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="modal-error" id="modal-error"></div>
+        <div class="modal-actions">
+          <button class="btn" onclick="hideModal()">Cancel</button>
+          <button class="btn btn-primary" id="modal-submit" onclick="submitModel()">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-overlay" id="confirm-overlay">
+      <div class="confirm-box">
+        <p id="confirm-message"></p>
+        <div class="confirm-actions">
+          <button class="btn" onclick="confirmCancel()">Cancel</button>
+          <button class="btn btn-danger" onclick="confirmOk()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROVIDERS = /*__PROVIDERS__*/[];
+    const PROVIDER_LIST = Array.isArray(PROVIDERS) ? PROVIDERS : [];
+    const API_BASE = '';
+    const PATTERN_CHARS = /[*?\[\](){}^$|\\+]/;
+
+    let adminToken = null;
+    let editingModel = null;
+    let cachedModels = [];
+    let _confirmResolve = null;
+
+    function isPattern(modelId) {
+      return PATTERN_CHARS.test(String(modelId == null ? '' : modelId));
+    }
+
+    function apiHeaders() {
+      return { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: apiHeaders() };
+      if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
+      let resp;
+      try {
+        resp = await fetch(API_BASE + path, opts);
+      } catch (e) {
+        return { ok: false, status: 0, data: { error: 'Network error' } };
+      }
+      let data = {};
+      try { data = await resp.json(); } catch (e) { data = {}; }
+      return { ok: resp.ok, status: resp.status, data };
+    }
+
+    function toast(msg, type) {
+      type = type || 'error';
+      const el = document.createElement('div');
+      el.className = 'toast toast-' + type;
+      el.textContent = msg;
+      document.getElementById('toast-container').appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
+    }
+
+    function escAttr(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function updateCounts() {
+      const total = cachedModels.length;
+      const enabled = cachedModels.filter(m => m.enabled).length;
+      document.getElementById('model-count').innerHTML =
+        `${total} model(s) &middot; <span class="count-on">${enabled}</span> enabled`;
+      document.getElementById('stats').textContent = `${enabled} enabled / ${total} total`;
+    }
+
+    function renderRow(m) {
+      const id = m.model || '';
+      const provider = m.provider || '';
+      const target = m.target || '';
+      const pattern = isPattern(id);
+      const idBadge = pattern
+        ? ' <span class="pattern-badge" title="Pattern rule: matches incoming model names and is not listed in /v1/models">Pattern</span>'
+        : '';
+      const targetCell = target
+        ? `<span class="target-cell">${esc(target)}</span>`
+        : `<span class="muted">${pattern ? 'Same as requested' : 'Same as public id'}</span>`;
+      const provCell = provider
+        ? `<span class="tag prov-tag">${esc(provider)}</span>`
+        : '<span class="muted">-</span>';
+      return `<tr data-model="${escAttr(id)}">
+        <td class="model-cell"><div class="model-line"><span>${esc(id)}</span>${idBadge}</div></td>
+        <td>${provCell}</td>
+        <td class="upstream-cell">${targetCell}</td>
+        <td>
+          <label class="toggle" title="${m.enabled ? 'Enabled' : 'Disabled'}">
+            <input type="checkbox" ${m.enabled ? 'checked' : ''} aria-label="Enabled" data-model="${escAttr(id)}" onchange="toggleModel(this)">
+            <span class="slider"></span>
+          </label>
+        </td>
+        <td class="col-actions" style="white-space:nowrap">
+          <button class="btn btn-sm" data-action="edit" data-model="${escAttr(id)}">Edit</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-model="${escAttr(id)}">Delete</button>
+        </td>
+      </tr>`;
+    }
+
+    async function loadModels() {
+      const result = await api('GET', '/admin/api/models');
+      if (!result.ok) {
+        if (result.status === 403) {
+          doLogout();
+          document.getElementById('login-error').textContent = 'Session expired, please log in again';
+          return;
+        }
+        document.getElementById('model-tbody').innerHTML =
+          '<tr><td colspan="5" class="empty">Failed to load the model catalog.</td></tr>';
+        document.getElementById('model-count').textContent = 'Models';
+        document.getElementById('stats').textContent = '';
+        toast((result.data && result.data.error) || 'Failed to load models');
+        return;
+      }
+      cachedModels = (result.data.models || []).slice().sort((a, b) => String(a.model).localeCompare(String(b.model)));
+      const tbody = document.getElementById('model-tbody');
+      if (cachedModels.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No models yet. Add one to make it available to clients.</td></tr>';
+      } else {
+        tbody.innerHTML = cachedModels.map(renderRow).join('');
+      }
+      updateCounts();
+    }
+
+    function populateProviderSelect(selected) {
+      const sel = document.getElementById('modal-provider');
+      sel.innerHTML = '';
+      const names = PROVIDER_LIST.slice();
+      if (selected && !names.includes(selected)) names.push(selected);
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = names.length ? 'Select a provider...' : 'No providers configured';
+      ph.disabled = true;
+      sel.appendChild(ph);
+      names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = PROVIDER_LIST.includes(name) ? name : name + ' (not configured)';
+        sel.appendChild(opt);
+      });
+      sel.value = selected && names.includes(selected) ? selected : '';
+      sel.disabled = names.length === 0;
+    }
+
+    function syncPatternBadge() {
+      const badge = document.getElementById('modal-pattern-badge');
+      badge.hidden = !isPattern(document.getElementById('modal-model').value.trim());
+    }
+
+    function showAddModal() {
+      if (PROVIDER_LIST.length === 0) {
+        toast('No providers are configured');
+        return;
+      }
+      editingModel = null;
+      document.getElementById('modal-title').textContent = 'Add Model';
+      document.getElementById('modal-model').value = '';
+      document.getElementById('modal-target').value = '';
+      document.getElementById('modal-enabled').checked = true;
+      document.getElementById('modal-error').textContent = '';
+      document.getElementById('modal-submit').textContent = 'Add';
+      populateProviderSelect('');
+      syncPatternBadge();
+      document.getElementById('modal-overlay').classList.add('active');
+      document.getElementById('modal-model').focus();
+    }
+
+    function openEdit(modelId) {
+      const m = cachedModels.find(x => x.model === modelId);
+      if (!m) return;
+      editingModel = m;
+      document.getElementById('modal-title').textContent = 'Edit Model';
+      document.getElementById('modal-model').value = m.model || '';
+      document.getElementById('modal-target').value = m.target || '';
+      document.getElementById('modal-enabled').checked = !!m.enabled;
+      document.getElementById('modal-error').textContent = '';
+      document.getElementById('modal-submit').textContent = 'Save';
+      populateProviderSelect(m.provider || '');
+      syncPatternBadge();
+      document.getElementById('modal-overlay').classList.add('active');
+      document.getElementById('modal-model').focus();
+    }
+
+    function hideModal() {
+      document.getElementById('modal-overlay').classList.remove('active');
+      editingModel = null;
+    }
+
+    async function submitModel() {
+      const model = document.getElementById('modal-model').value.trim();
+      const provider = document.getElementById('modal-provider').value;
+      const target = document.getElementById('modal-target').value.trim();
+      const enabled = document.getElementById('modal-enabled').checked;
+      const errEl = document.getElementById('modal-error');
+      errEl.textContent = '';
+      if (!model) {
+        errEl.textContent = 'Model id or pattern is required';
+        return;
+      }
+      if (!provider) {
+        errEl.textContent = 'Provider is required';
+        return;
+      }
+      const duplicate = cachedModels.some(m => m.model === model && (!editingModel || m.model !== editingModel.model));
+      if (duplicate) {
+        errEl.textContent = 'An entry with this id or pattern already exists';
+        return;
+      }
+      const wasEditing = !!editingModel;
+      const previousId = editingModel ? editingModel.model : null;
+      const result = await api('POST', '/admin/api/models', { model, provider, target, enabled });
+      if (!result.ok) {
+        errEl.textContent = (result.data && result.data.error) || 'Failed to save model';
+        return;
+      }
+      if (wasEditing && previousId && previousId !== model) {
+        const del = await api('DELETE', '/admin/api/models', { model: previousId });
+        if (!del.ok) toast((del.data && del.data.error) || 'Failed to remove the old model id');
+      }
+      hideModal();
+      await loadModels();
+      toast(wasEditing ? 'Model updated' : 'Model added', 'success');
+    }
+
+    async function toggleModel(checkbox) {
+      const modelId = checkbox.dataset.model;
+      const m = cachedModels.find(x => x.model === modelId);
+      if (!m) {
+        checkbox.checked = !checkbox.checked;
+        return;
+      }
+      const next = checkbox.checked;
+      checkbox.disabled = true;
+      const result = await api('POST', '/admin/api/models', {
+        model: m.model,
+        provider: m.provider,
+        target: m.target || '',
+        enabled: next,
+      });
+      checkbox.disabled = false;
+      if (!result.ok) {
+        checkbox.checked = !next;
+        toast((result.data && result.data.error) || 'Failed to update model');
+        return;
+      }
+      m.enabled = next;
+      checkbox.closest('.toggle').title = next ? 'Enabled' : 'Disabled';
+      updateCounts();
+    }
+
+    function showConfirm(msg) {
+      document.getElementById('confirm-message').textContent = msg;
+      document.getElementById('confirm-overlay').classList.add('active');
+      return new Promise(resolve => { _confirmResolve = resolve; });
+    }
+
+    function confirmOk() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+    }
+
+    function confirmCancel() {
+      document.getElementById('confirm-overlay').classList.remove('active');
+      if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+    }
+
+    async function confirmDelete(modelId) {
+      const ok = await showConfirm('Delete model "' + modelId + '" from the catalog?');
+      if (!ok) return;
+      const result = await api('DELETE', '/admin/api/models', { model: modelId });
+      if (!result.ok) {
+        toast((result.data && result.data.error) || 'Failed to delete model');
+        return;
+      }
+      await loadModels();
+      toast('Model deleted', 'success');
+    }
+
+    document.getElementById('model-tbody').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const modelId = btn.dataset.model;
+      if (btn.dataset.action === 'edit') openEdit(modelId);
+      else if (btn.dataset.action === 'delete') confirmDelete(modelId);
+    });
+
+    document.getElementById('modal-model').addEventListener('input', syncPatternBadge);
+
+    document.getElementById('modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) hideModal();
+    });
+
+    document.getElementById('modal-overlay').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') {
+        e.preventDefault();
+        submitModel();
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (document.getElementById('modal-overlay').classList.contains('active')) {
+        hideModal();
+      } else if (document.getElementById('confirm-overlay').classList.contains('active')) {
+        confirmCancel();
+      }
+    });
+
+    async function doLogin() {
+      const token = document.getElementById('login-token').value.trim();
+      if (!token) {
+        document.getElementById('login-error').textContent = 'Please enter a token';
+        return;
+      }
+      document.getElementById('login-error').textContent = '';
+      try {
+        const resp = await fetch('/admin/api/models', {
+          headers: { 'X-Admin-Token': token },
+        });
+        if (resp.status === 403) {
+          document.getElementById('login-error').textContent = 'Invalid admin token';
+          return;
+        }
+        if (!resp.ok) {
+          document.getElementById('login-error').textContent = 'Login failed';
+          return;
+        }
+        adminToken = token;
+        localStorage.setItem('admin_token', document.getElementById('login-remember').checked ? token : '');
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('catalog-content').classList.add('active');
+        loadModels();
+      } catch (e) {
+        document.getElementById('login-error').textContent = 'Network error';
+      }
+    }
+
+    function doLogout() {
+      adminToken = null;
+      cachedModels = [];
+      localStorage.removeItem('admin_token');
+      document.getElementById('login-token').value = '';
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('catalog-content').classList.remove('active');
+    }
+
+    document.getElementById('login-token').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    (function autoLogin() {
+      const saved = localStorage.getItem('admin_token');
+      if (saved) {
+        document.getElementById('login-token').value = saved;
+        document.getElementById('login-remember').checked = true;
+        doLogin();
+      }
+    })();
+  </script>
+</body>
+
+</html>

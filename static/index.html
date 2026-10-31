@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OneGate</title>
-  <link rel="stylesheet" href="/static/common.css">
+  <link rel="stylesheet" href="/static/common.css?v=6">
+  <script src="/static/header.js?v=1"></script>
   <style>
     .hero {
       text-align: center;
@@ -85,10 +86,10 @@
 </head>
 
 <body>
-  <div class="header">
-    <h1>OneGate</h1>
-    <span class="info">Multi-Provider AI Reverse Proxy</span>
-  </div>
+  <div id="og-header"></div>
+  <script>
+    OneGateHeader.mount('#og-header', { active: 'home' });
+  </script>
 
   <div class="hero">
     <h1>OneGate</h1>
@@ -99,8 +100,8 @@
     <div class="nav-grid">
       <a class="nav-card" href="/status">
         <span class="title">Service Status</span>
-        <span class="desc">Monitor provider health, request success rates, and hourly trend charts.</span>
-        <span class="badge public">Public</span>
+        <span class="desc">Sign in with your proxy token to see provider health, success rates, and hourly trends for the providers you can use.</span>
+        <span class="badge public">Token Required</span>
       </a>
       <a class="nav-card" href="/usage">
         <span class="title">Usage Query</span>
@@ -116,6 +117,16 @@
         <span class="title">Model Mapping</span>
         <span class="desc">Define custom model name mapping rules with wildcard pattern matching for your token.</span>
         <span class="badge public">Token Required</span>
+      </a>
+      <a class="nav-card" href="/models">
+        <span class="title">Model Catalog</span>
+        <span class="desc">Browse the model ids clients can call, and which provider and upstream model each id maps to.</span>
+        <span class="badge">Admin Only</span>
+      </a>
+      <a class="nav-card" href="/pricing">
+        <span class="title">Model Pricing</span>
+        <span class="desc">View per-model token pricing (input/output, cache hit/miss). Admins can edit prices.</span>
+        <span class="badge public">Public</span>
       </a>
       <a class="nav-card" href="/throughput">
         <span class="title">Throughput Monitor</span>
