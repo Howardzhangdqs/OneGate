@@ -13,7 +13,7 @@ from src.db import add_token, init_db, set_site_model
 from src.models import Provider, TokenEntry
 from src.v1_handler import _with_identity_encoding, create_v1_handlers
 
-_TOKEN = "aaa111bbb222ccc333ddd444eee555ff.Zk1pGnRvtztoeAb1"
+_TOKEN = "aaa111bbb222ccc333ddd444eee555ff.testtoken0000000"
 
 
 class _FakeChunk:

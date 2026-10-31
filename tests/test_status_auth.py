@@ -26,9 +26,9 @@ def _make_token(suffix: str) -> str:
     return f"{_sample_token()}.{suffix}"
 
 
-WILDCARD_TOKEN = _make_token("Zk1pGnRvtztoeAb1")
-RESTRICTED_TOKEN = _make_token("Rstr1ctedT0kenAb")
-DISABLED_TOKEN = _make_token("D1sabledT0kenAb1")
+WILDCARD_TOKEN = _make_token("testtoken0000000")
+RESTRICTED_TOKEN = _make_token("restricted000000")
+DISABLED_TOKEN = _make_token("disabled00000000")
 
 
 class TestStatusAuth(AioHTTPTestCase):

@@ -32,7 +32,7 @@ def _sample_token() -> str:
 
 
 def _make_token_full() -> str:
-    return f"{_sample_token()}.Zk1pGnRvtztoeAb1"
+    return f"{_sample_token()}.testtoken0000000"
 
 
 def test_provider_model():
@@ -231,7 +231,7 @@ def test_resolve_token_not_in_pool():
     pool: dict[str, TokenEntry] = {}
     provider = Provider("glm", "/glm", "https://open.bigmodel.cn", True)
     real_tokens = {"glm": "real-glm-token"}
-    auth = f"Bearer {_sample_token()}.Zk1pGnRvtztoeAb1"
+    auth = f"Bearer {_sample_token()}.testtoken0000000"
 
     proxy_token, resolved = resolve_token(auth, provider, pool, real_tokens)
     assert proxy_token is None
@@ -576,10 +576,10 @@ strip_prefix = true
 env_token = "CUSTOM_SECRET_KEY"
 """)
 
-        os.environ["CUSTOM_SECRET_KEY"] = "sk-test-12345"
+        os.environ["CUSTOM_SECRET_KEY"] = "dummy-upstream-key"
         try:
             cfg = load_config(config_dir=tmpdir)
-            assert cfg.real_tokens["myprov"] == "sk-test-12345"
+            assert cfg.real_tokens["myprov"] == "dummy-upstream-key"
         finally:
             os.environ.pop("CUSTOM_SECRET_KEY", None)
 

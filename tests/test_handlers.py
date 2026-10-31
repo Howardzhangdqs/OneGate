@@ -32,7 +32,7 @@ def _sample_token() -> str:
 
 
 def _make_token_full() -> str:
-    return f"{_sample_token()}.Zk1pGnRvtztoeAb1"
+    return f"{_sample_token()}.testtoken0000000"
 
 
 def _make_admin_token() -> str:
