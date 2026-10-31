@@ -21,7 +21,9 @@ def make_token() -> str:
 def load_pool_from_db(conn: sqlite3.Connection) -> dict[str, TokenEntry]:
     cur = conn.execute(
         "SELECT token, providers, is_admin, enabled, created_at, describe, "
-        "rpm, rph, rpd, rpt, success_count FROM token_pool"
+        "rpm, rph, rpd, rpw, rpmo, rpt, tpm, tph, tpd, tpw, tpmo, tpt, "
+        "success_count, token_count, cache_read_weight, cache_write_weight, models "
+        "FROM token_pool"
     )
     pool: dict[str, TokenEntry] = {}
     for row in cur.fetchall():

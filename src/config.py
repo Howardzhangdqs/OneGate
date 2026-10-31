@@ -28,6 +28,13 @@ class AppConfig:
     banned_ips: list[str] = field(default_factory=list)
     banned_uas: list[str] = field(default_factory=list)
     decompress_log: bool = True
+    cache_read_weight: float = 0.0
+    cache_write_weight: float = 0.0
+    privacy_strip_tracking: bool = True
+    privacy_ua_override: str = ""
+    quota_base: str = ""
+    quota_token: str = ""
+    quota_cache_ttl: int = 60
 
 
 def load_config(config_dir: str | None = None) -> AppConfig:
@@ -74,6 +81,15 @@ def load_config(config_dir: str | None = None) -> AppConfig:
     compression_cfg = data.get("compression", {})
     cfg.decompress_log = compression_cfg.get("decompress_log", True)
 
+    privacy_cfg = data.get("privacy", {})
+    cfg.privacy_strip_tracking = privacy_cfg.get("strip_tracking", True)
+    cfg.privacy_ua_override = privacy_cfg.get("ua_override", "")
+
+    quota_cfg = data.get("quota", {})
+    cfg.quota_base = quota_cfg.get("base", "")
+    cfg.quota_token = quota_cfg.get("token", "")
+    cfg.quota_cache_ttl = int(quota_cfg.get("cache_ttl", 60))
+
     pool_cfg = data.get("pool", {})
     env_pool_count = os.environ.get("POOL_COUNT")
     cfg_pool_count = pool_cfg.get("count", 5)
@@ -81,6 +97,8 @@ def load_config(config_dir: str | None = None) -> AppConfig:
     cfg.pool_file = pool_cfg.get("file", "pool.json")
     cfg.usage_db = pool_cfg.get("usage_db", "data/onegate.db")
     cfg.admin_tokens = pool_cfg.get("admin_tokens", [])
+    cfg.cache_read_weight = float(pool_cfg.get("cache_read_weight", 0.0))
+    cfg.cache_write_weight = float(pool_cfg.get("cache_write_weight", 0.0))
 
     cfg.banned_ips = data.get("banned_ips", [])
     cfg.banned_uas = data.get("banned_uas", [])

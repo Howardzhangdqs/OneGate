@@ -21,10 +21,26 @@ sock_read = 900
 # Supports: gzip, deflate, br (requires brotli package), zstd (requires zstandard package).
 decompress_log = true
 
+[privacy]
+# Strip client-tracking identifiers before forwarding upstream:
+# - tracking headers (x-session-id, x-zcode-trace-id, x-query-id, x-request-id,
+#   x-title, x-os-*, x-platform, x-client-timezone/language, x-release-channel,
+#   x-zcode-*, x-app, http-referer, x-stainless-*, X-Forwarded-*, X-Real-IP)
+# - body fields "metadata" (Anthropic user_id device/session ids) and "user" (OpenAI)
+# Client detection for usage stats is unaffected (it reads the inbound request).
+strip_tracking = true
+# User-Agent sent upstream when set; "" (default) keeps the client's original UA.
+ua_override = ""
+
 [pool]
 count = 10
 usage_db = "data/onegate.db"
 # admin_tokens = []  # Auto-generated on first startup if empty
+# Global default cache-token weights for TP* (tokens-per-*) accounting.
+# TP usage = input + output + cache_read_weight*cache_read + cache_write_weight*cache_write.
+# Per-token weights can override these (set to -1 in admin to inherit).
+# cache_read_weight = 0.0
+# cache_write_weight = 0.0
 
 [providers.openai]
 prefix = "/oai"
@@ -50,8 +66,38 @@ upstream = "https://open.bigmodel.cn/api/coding/paas/v4"
 strip_prefix = true
 env_token = "TOKEN_ZHIPUAI"
 
+[providers.deepseek]
+prefix = "/deepseek"
+upstream = "https://api.deepseek.com"
+strip_prefix = true
+env_token = "TOKEN_DEEPSEEK"
+
+# OpenAI-compatible gateways that issue distinct keys per model family:
+# one provider block per key (same upstream, different env_token) so each key
+# gets its own status/usage bucket. Client base_url = http://<host>:<port>/gjzq/glm
+# (request /v1/chat/completions is appended, prefix is stripped before forwarding).
+[providers.gjzq-glm]
+prefix = "/gjzq/glm"
+upstream = "https://gpt.gjzq.cn/prod-api"
+strip_prefix = true
+env_token = "TOKEN_GJZQ_GLM"
+
+[providers.gjzq-deepseek]
+prefix = "/gjzq/ds"
+upstream = "https://gpt.gjzq.cn/prod-api"
+strip_prefix = true
+env_token = "TOKEN_GJZQ_DS"
+
 [providers.default]
 prefix = "/"
 upstream = "https://api.openai.com"
 strip_prefix = false
 env_token = "TOKEN_OPENAI"
+
+# [quota]
+# Coding Plan quota card on the /usage page.
+# Defaults: origin of the provider with v1_base (else the "/" provider),
+# its env_token, and a 60s cache. Set explicitly to override.
+# base = "https://open.bigmodel.cn"
+# token = ""
+# cache_ttl = 60
