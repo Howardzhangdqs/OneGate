@@ -10,7 +10,11 @@ Route requests to different upstream AI providers by URL prefix, with per-token 
 - **Longest-prefix matching** -- most specific prefix wins; `/` is the fallback
 - **Token pool** -- SQLite-backed token storage with auto-migration from legacy `pool.json`
 - **Per-token permissions** -- restrict each token to specific providers; `["*"]` for all
+- **Model catalog** -- site-wide public model ids mapped to a provider and upstream model name
+- **Per-token model visibility** -- restrict each token to an allowlist of catalog model ids; `["*"]` for all
+- **OpenAI-compatible model listing** -- `GET /v1/models` returns the catalog entries the calling token may use
 - **Admin panel** -- web UI at `/admin?token=<admin_token>` for CRUD on tokens
+- **Status dashboard** -- token-scoped provider uptime and success stats at `/status`
 - **Admin self-protection** -- cannot demote, disable, or delete your own admin account
 - **Request logging** -- optional full request/response logging to SQLite
 
@@ -94,6 +98,47 @@ Each provider entry:
 | `strip_prefix` | Remove the prefix before forwarding |
 | `env_token` | `.env` variable name holding the real API key |
 
+### Example: one upstream, one key per model family
+
+When an OpenAI-compatible gateway issues a different key per model, register one
+provider block per key with the same `upstream` but distinct `prefix`. Each key
+then gets its own usage/status bucket, and the model name is forwarded untouched.
+
+```toml
+[providers.gjzq-glm]
+prefix = "/gjzq/glm"
+upstream = "https://gpt.gjzq.cn/prod-api"
+strip_prefix = true
+env_token = "TOKEN_GJZQ_GLM"
+
+[providers.gjzq-deepseek]
+prefix = "/gjzq/ds"
+upstream = "https://gpt.gjzq.cn/prod-api"
+strip_prefix = true
+env_token = "TOKEN_GJZQ_DS"
+```
+
+Clients keep the standard OpenAI shape — the prefix only replaces the host part:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://<onegate-host>:5678/gjzq/glm",
+    api_key="<onegate proxy token>",
+)
+client.chat.completions.create(
+    model="glm-5.3-flash",
+    messages=[{"role": "user", "content": "hi"}],
+)
+```
+
+`POST /gjzq/glm/v1/chat/completions` -> `https://gpt.gjzq.cn/prod-api/v1/chat/completions`.
+The proxy token is validated against the pool, then swapped for `TOKEN_GJZQ_GLM`
+before forwarding. Note that some upstreams sit behind a WAF that rejects
+scripting User-Agents (e.g. `curl/*`); clients normally send their own UA, and
+`privacy.ua_override` is the global escape hatch if one is blocked.
+
 ## Admin Panel
 
 Access at `/admin?token=<admin_token>`.
@@ -104,6 +149,39 @@ From the admin panel you can:
 - Create new tokens with specific provider access
 - Toggle admin / enabled status
 - Delete tokens (with self-protection for your own admin)
+
+### Model catalog
+
+The `/models` page (admin token required) maintains a site-wide catalog of
+public model ids. Each entry maps a model id to a configured provider and an
+optional upstream model name (`target`), and can be enabled or disabled.
+
+A catalog entry may also be a wildcard or regex rule, e.g. `glm-*` or
+`^claude-(.+)$`. Incoming model names are matched in this order: exact id
+first, then pattern entries (longest first) tried as a regex full match and
+then as an `fnmatch` wildcard. `target` may reference regex capture groups with
+`$1`..`$n`; an empty target forwards the requested name unchanged. Pattern
+rules route requests but are not returned by `/v1/models`, which only lists
+concrete model ids.
+
+`GET /v1/models` (also `/v1/model`, plus `/v1/models/{model}` for one entry) is authenticated with the normal
+proxy Bearer token and returns only catalog entries the token may use, based on
+its provider permissions and model allowlist. Chat and responses requests
+resolve a model in this order: per-token mapping rules, then the site catalog
+(exact, then pattern rules), then the requested model unchanged on the default
+provider.
+
+## Status Page
+
+The `/status` page shows per-provider uptime, hourly success rates, and summary
+stats. Its data endpoint, `GET /status/api`, requires a proxy token in the
+`X-Proxy-Token` header and returns only the providers that token is allowed to
+use, so each visitor sees their own slice of the dashboard. A token with
+`providers = ["*"]` sees every configured provider group.
+
+```bash
+curl -H "X-Proxy-Token: <proxy token>" http://<onegate-host>:5678/status/api
+```
 
 ## Project Structure
 

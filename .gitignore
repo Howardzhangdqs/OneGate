@@ -36,5 +36,8 @@ uv.lock
 
 # Development documentation
 docs/
+
+# Local scratch notes (may contain secrets)
+static/commands.txt
 # ZCode agent
 .zcode/

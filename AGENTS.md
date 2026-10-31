@@ -35,7 +35,7 @@ uv run ruff format src/ tests/ # Format
 - `src/db.py` - SQLite layer: schema, migrations, CRUD, rate limits, usage tracking
 - `src/log.py` - Request/response logging (full JSON or headers-only JSONL)
 - `src/network.py` - Public IP detection
-- `static/` - Admin, usage, status HTML pages + shared CSS
+- `static/` - Admin, usage, status, pricing HTML pages + shared CSS
 - `config.toml` - Runtime config (gitignored, contains secrets)
 - `config.toml.example` - Config template
 - `onegate.service` - Systemd unit file for production
@@ -53,6 +53,7 @@ Key fields:
 - `banned_ips` - List of IPs to block
 - `banned_uas` - List of UA wildcard patterns to block (fnmatch syntax, e.g. `Bun*`)
 - `[timeout]` - total, connect, sock_read
+- `[privacy]` - strip_tracking (drop client tracking headers + body metadata/user fields before forwarding), ua_override (rewrite upstream User-Agent; default "" keeps the client's original)
 - `[pool]` - count, usage_db, admin_tokens
 - `[providers.*]` - prefix, upstream, strip_prefix, env_token
 
