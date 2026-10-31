@@ -21,6 +21,7 @@ UA_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("goose", ("goose",)),
     ("serena", ("serena",)),
     ("ampcode", ("ampcode",)),
+    ("deepseek-harness", ("deepseek-harness",)),
     ("python-openai", ("openai-python",)),
     ("node-openai", ("openai-node",)),
 ]
@@ -79,6 +80,7 @@ _CLIENT_LABELS: dict[str, str] = {
     "crush": "Crush",
     "goose": "Goose",
     "serena": "Serena",
+    "deepseek-harness": "DeepSeek Harness",
     "python-openai": "OpenAI SDK (Python)",
     "node-openai": "OpenAI SDK (Node)",
     "unknown": "Unknown",

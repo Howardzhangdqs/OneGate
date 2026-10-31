@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import mimetypes
 import os
 import ssl
 import time
@@ -8,19 +9,34 @@ import aiohttp
 from aiohttp import web
 from dotenv import load_dotenv
 
-from src.admin import create_admin_handlers, create_mapping_handlers
+from src.admin import (
+    create_admin_handlers,
+    create_mapping_handlers,
+    create_pricing_handlers,
+    create_site_model_handlers,
+)
 from src.config import load_config
 from src.db import init_db
 from src.handlers import create_handlers
 from src.network import fetch_public_ip
 from src.pool import load_pool_from_db
+from src.quota import create_quota_handlers
 from src.throughput import ThroughputMonitor, create_throughput_handlers
+from src.usage_monitor import UsageMonitor
 from src.v1_handler import create_v1_handlers
+
+mimetypes.add_type("font/ttf", ".ttf")
+mimetypes.add_type("font/otf", ".otf")
+mimetypes.add_type("font/woff", ".woff")
+mimetypes.add_type("font/woff2", ".woff2")
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "WARNING").upper(),
+    format="%(levelname)s %(name)s %(message)s",
+)
 
 
 async def main():
@@ -61,8 +77,12 @@ async def main():
 
     monitor = ThroughputMonitor(token_pool)
     serve_tp_page, create_tp_session, tp_sse = create_throughput_handlers(
-        monitor, token_pool
+        monitor, token_pool, db_conn
     )
+
+    usage_monitor = UsageMonitor(token_pool)
+
+    quota_api_handler = create_quota_handlers(cfg, session)
 
     (
         serve_usage_page,
@@ -72,8 +92,17 @@ async def main():
         status_api_handler,
         serve_clients_page,
         clients_api_handler,
+        usage_stream_api,
+        usage_sse_handler,
     ) = create_handlers(
-        cfg, token_pool, db_conn, public_ip, session, time.time(), monitor
+        cfg,
+        token_pool,
+        db_conn,
+        public_ip,
+        session,
+        time.time(),
+        monitor,
+        usage_monitor,
     )
 
     (
@@ -92,9 +121,26 @@ async def main():
         api_delete_mapping,
     ) = create_mapping_handlers(cfg, db_conn, token_pool)
 
-    v1_chat_completions, v1_responses = create_v1_handlers(
-        cfg, token_pool, db_conn, monitor
-    )
+    (
+        serve_pricing_page,
+        api_list_pricing,
+        api_set_pricing,
+        api_delete_pricing,
+    ) = create_pricing_handlers(cfg, db_conn)
+
+    (
+        serve_models_page,
+        api_list_models,
+        api_set_model,
+        api_delete_model,
+    ) = create_site_model_handlers(cfg, db_conn)
+
+    (
+        v1_chat_completions,
+        v1_responses,
+        v1_list_models,
+        v1_get_model,
+    ) = create_v1_handlers(cfg, token_pool, db_conn, monitor, usage_monitor)
 
     app = web.Application(
         client_max_size=100 * 1024 * 1024,
@@ -103,7 +149,10 @@ async def main():
     app.on_cleanup.append(on_cleanup)
     app.router.add_static("/static", STATIC_DIR)
     app.router.add_get("/usage", serve_usage_page)
+    app.router.add_get("/usage/api/quota", quota_api_handler)
     app.router.add_post("/usage/api", info_api_handler)
+    app.router.add_post("/usage/api/stream", usage_stream_api)
+    app.router.add_get("/usage/events", usage_sse_handler)
     app.router.add_get("/admin", serve_admin_page)
     app.router.add_get("/admin/api/tokens", api_list_tokens)
     app.router.add_post("/admin/api/tokens", api_create_token)
@@ -121,6 +170,18 @@ async def main():
     app.router.add_get("/mapping/api", api_list_mappings)
     app.router.add_post("/mapping/api", api_set_mapping)
     app.router.add_delete("/mapping/api", api_delete_mapping)
+    app.router.add_get("/pricing", serve_pricing_page)
+    app.router.add_get("/pricing/api", api_list_pricing)
+    app.router.add_post("/pricing/api", api_set_pricing)
+    app.router.add_delete("/pricing/api", api_delete_pricing)
+    app.router.add_get("/models", serve_models_page)
+    app.router.add_get("/admin/api/models", api_list_models)
+    app.router.add_post("/admin/api/models", api_set_model)
+    app.router.add_delete("/admin/api/models", api_delete_model)
+    app.router.add_get("/v1/models", v1_list_models)
+    app.router.add_get("/v1/model", v1_list_models)
+    app.router.add_get("/v1/models/{model}", v1_get_model)
+    app.router.add_get("/litellm/v1/models", v1_list_models)
 
     async def serve_index(_request: web.Request) -> web.FileResponse:
         return web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
@@ -146,9 +207,19 @@ async def main():
     print(f"Client stats: http://0.0.0.0:{cfg.bind_port}/clients")
     print(f"Admin panel: http://0.0.0.0:{cfg.bind_port}/admin")
     print(f"Model mapping: http://0.0.0.0:{cfg.bind_port}/mapping")
+    print(f"Pricing: http://0.0.0.0:{cfg.bind_port}/pricing")
+    print(f"Models: http://0.0.0.0:{cfg.bind_port}/models")
     print(f"Throughput: http://0.0.0.0:{cfg.bind_port}/throughput")
     print(f"Intercept: {cfg.intercept_port or 'disabled'}")
     print(f"Logging: {'enabled' if cfg.enable_log else 'disabled'}")
+    print(
+        f"Privacy strip: {'enabled' if cfg.privacy_strip_tracking else 'disabled'}"
+        + (
+            f" (UA: {cfg.privacy_ua_override})"
+            if cfg.privacy_strip_tracking and cfg.privacy_ua_override
+            else ""
+        )
+    )
     print(
         f"Timeouts: total={cfg.timeout_total}s, connect={cfg.timeout_connect}s, sock_read={cfg.timeout_sock_read}s"
     )

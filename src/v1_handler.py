@@ -3,22 +3,30 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import datetime, timezone
 
 from aiohttp import web
 
 from src.client_detect import detect_client
 from src.config import AppConfig
 from src.db import (
+    check_rate_limit,
+    get_site_models,
+    is_site_model_pattern,
     record_client_token_usage,
     record_client_usage,
     record_success,
     record_token_usage,
     record_usage,
-    resolve_model,
+    resolve_model_ex,
+    resolve_site_model_exact,
+    resolve_site_model_pattern,
 )
 from src.models import Provider, TokenEntry
 from src.pool import resolve_token
 from src.throughput import make_tracker
+
+_V1_PRIVACY_SKIP = frozenset({"user", "metadata", "extra_headers"})
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +48,8 @@ def _litellm_usage_to_tuple(usage) -> tuple[int, int, int, int]:
         created = getattr(ptd, "cache_creation_tokens", None)
         if isinstance(created, int):
             cache_write = cache_write or created
+    if cache_read > 0:
+        input_tokens = max(0, input_tokens - cache_read)
     return int(input_tokens), int(output_tokens), int(cache_read), int(cache_write)
 
 
@@ -55,6 +65,16 @@ def _get_litellm_base_url(provider: Provider) -> str:
     if upstream.endswith("/v1"):
         return upstream
     return upstream.rstrip("/") + "/v1"
+
+
+def _with_identity_encoding(headers: dict | None) -> dict:
+    merged = {
+        key: value
+        for key, value in (headers or {}).items()
+        if key.lower() != "accept-encoding"
+    }
+    merged["Accept-Encoding"] = "identity"
+    return merged
 
 
 def _parse_request_model(body: bytes | None) -> str:
@@ -89,12 +109,18 @@ def _resolve_v1_mapping(
     cfg: AppConfig,
     proxy_token: str,
     model: str,
-) -> tuple[str | None, Provider | None, str]:
-    mapped_model, mapped_provider_name = resolve_model(db_conn, proxy_token, model)
-    provider = None
-    if mapped_provider_name:
+) -> tuple[str | None, Provider | None, str, bool]:
+    mapped_model, mapped_provider_name, matched = resolve_model_ex(
+        db_conn, proxy_token, model
+    )
+    if matched:
         provider = _get_provider_by_name(cfg, mapped_provider_name)
-    return mapped_model, provider, model
+        return mapped_model, provider, model, True
+    row = resolve_site_model_pattern(db_conn, model)
+    if row:
+        provider = _get_provider_by_name(cfg, row["provider"])
+        return row["target"] or model, provider, model, False
+    return model, None, model, False
 
 
 def create_v1_handlers(
@@ -102,6 +128,7 @@ def create_v1_handlers(
     token_pool: dict[str, TokenEntry],
     db_conn,
     monitor=None,
+    usage_monitor=None,
 ):
     def _authenticate(
         request: web.Request,
@@ -123,6 +150,7 @@ def create_v1_handlers(
         response,
         is_stream: bool,
         client: str = "unknown",
+        model: str = "",
     ) -> None:
         if not proxy_token:
             return
@@ -143,10 +171,64 @@ def create_v1_handlers(
         except Exception as e:
             logger.warning("V1 usage extraction failed: %s", e)
         tin, tout, tcr, tcw = _litellm_usage_to_tuple(usage)
-        record_token_usage(db_conn, proxy_token, provider_name, tin, tout, tcr, tcw)
-        record_client_token_usage(
-            db_conn, proxy_token, provider_name, client, tin, tout, tcr, tcw
+        entry = token_pool.get(proxy_token)
+        if entry is not None:
+            cr_w = (
+                entry.cache_read_weight
+                if entry.cache_read_weight >= 0
+                else cfg.cache_read_weight
+            )
+            cw_w = (
+                entry.cache_write_weight
+                if entry.cache_write_weight >= 0
+                else cfg.cache_write_weight
+            )
+        else:
+            cr_w, cw_w = cfg.cache_read_weight, cfg.cache_write_weight
+        record_token_usage(
+            db_conn,
+            proxy_token,
+            provider_name,
+            tin,
+            tout,
+            tcr,
+            tcw,
+            cr_w,
+            cw_w,
+            model=model,
         )
+        record_client_token_usage(
+            db_conn,
+            proxy_token,
+            provider_name,
+            client,
+            tin,
+            tout,
+            tcr,
+            tcw,
+            model=model,
+        )
+        if usage_monitor is not None and usage_monitor.is_active(proxy_token):
+            now_ts = int(time.time())
+            hour_ts = now_ts - (now_ts % 3600)
+            hour_key = datetime.fromtimestamp(hour_ts, tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            usage_monitor.notify_usage(
+                proxy_token,
+                {
+                    "hour": hour_key,
+                    "provider": provider_name,
+                    "client": client,
+                    "model": model,
+                    "input": tin,
+                    "output": tout,
+                    "cache_read": tcr,
+                    "cache_write": tcw,
+                    "requests": 1,
+                    "ts": now_ts,
+                },
+            )
 
     async def v1_chat_completions(request: web.Request) -> web.StreamResponse:
         import litellm
@@ -165,8 +247,8 @@ def create_v1_handlers(
         if auth_err:
             return auth_err
 
-        mapped_model, target_provider, original_model = _resolve_v1_mapping(
-            db_conn, cfg, proxy_token, model
+        mapped_model, target_provider, original_model, token_matched = (
+            _resolve_v1_mapping(db_conn, cfg, proxy_token, model)
         )
         if mapped_model is None:
             return web.json_response(
@@ -181,6 +263,12 @@ def create_v1_handlers(
             target_provider = cfg.providers[0]
 
         entry = token_pool.get(proxy_token)
+        if not token_matched and entry is not None and entry.models != ["*"]:
+            if not entry.has_model_permission(original_model):
+                return web.json_response(
+                    {"error": f"token not authorized for model '{original_model}'"},
+                    status=403,
+                )
         if entry is None or not entry.has_permission(target_provider):
             return web.json_response(
                 {
@@ -188,6 +276,18 @@ def create_v1_handlers(
                 },
                 status=403,
             )
+
+        if entry.has_limits:
+            allowed, triggered, quota_info = check_rate_limit(db_conn, entry)
+            if not allowed:
+                return web.json_response(
+                    {
+                        "error": "rate limit exceeded",
+                        "triggered": triggered,
+                        "quota": quota_info,
+                    },
+                    status=429,
+                )
 
         real_token = cfg.real_tokens.get(target_provider.name, "")
         litellm_model = _get_litellm_model(target_provider, mapped_model)
@@ -229,6 +329,8 @@ def create_v1_handlers(
             "extra_headers",
             "thinking",
         ):
+            if cfg.privacy_strip_tracking and key in _V1_PRIVACY_SKIP:
+                continue
             if key in req_obj:
                 kwargs[key] = req_obj[key]
 
@@ -250,6 +352,9 @@ def create_v1_handlers(
         start_time = time.monotonic()
         try:
             if is_stream:
+                kwargs["extra_headers"] = _with_identity_encoding(
+                    kwargs.get("extra_headers")
+                )
                 response = await litellm.acompletion(
                     model=litellm_model,
                     messages=messages,
@@ -283,6 +388,7 @@ def create_v1_handlers(
                     response,
                     is_stream=True,
                     client=client,
+                    model=mapped_model,
                 )
                 return resp
             else:
@@ -295,7 +401,7 @@ def create_v1_handlers(
                 )
                 resp_body = response.model_dump_json(exclude_none=True)
                 elapsed = time.monotonic() - start_time
-                logger.info(
+                logger.debug(
                     "V1 %s -> [%s] %s %.2fs",
                     original_model,
                     target_provider.name,
@@ -310,6 +416,7 @@ def create_v1_handlers(
                     response,
                     is_stream=False,
                     client=client,
+                    model=mapped_model,
                 )
                 return web.Response(
                     text=resp_body,
@@ -363,8 +470,8 @@ def create_v1_handlers(
         if auth_err:
             return auth_err
 
-        mapped_model, target_provider, original_model = _resolve_v1_mapping(
-            db_conn, cfg, proxy_token, model
+        mapped_model, target_provider, original_model, token_matched = (
+            _resolve_v1_mapping(db_conn, cfg, proxy_token, model)
         )
         if mapped_model is None:
             return web.json_response(
@@ -379,6 +486,12 @@ def create_v1_handlers(
             target_provider = cfg.providers[0]
 
         entry = token_pool.get(proxy_token)
+        if not token_matched and entry is not None and entry.models != ["*"]:
+            if not entry.has_model_permission(original_model):
+                return web.json_response(
+                    {"error": f"token not authorized for model '{original_model}'"},
+                    status=403,
+                )
         if entry is None or not entry.has_permission(target_provider):
             return web.json_response(
                 {
@@ -386,6 +499,18 @@ def create_v1_handlers(
                 },
                 status=403,
             )
+
+        if entry.has_limits:
+            allowed, triggered, quota_info = check_rate_limit(db_conn, entry)
+            if not allowed:
+                return web.json_response(
+                    {
+                        "error": "rate limit exceeded",
+                        "triggered": triggered,
+                        "quota": quota_info,
+                    },
+                    status=429,
+                )
 
         real_token = cfg.real_tokens.get(target_provider.name, "")
         litellm_model = _get_litellm_model(target_provider, mapped_model)
@@ -414,6 +539,8 @@ def create_v1_handlers(
             "previous_response_id",
             "metadata",
         ):
+            if cfg.privacy_strip_tracking and key in _V1_PRIVACY_SKIP:
+                continue
             if key in req_obj:
                 resp_kwargs[key] = req_obj[key]
 
@@ -449,12 +576,15 @@ def create_v1_handlers(
                 if not chat_request["tools"]:
                     chat_request.pop("tools", None)
                     chat_request.pop("tool_choice", None)
-            logger.info(
+            logger.debug(
                 "V1 RESPONSES chat_request: %s",
                 {k: v for k, v in chat_request.items() if k not in ("api_key",)},
             )
 
             if is_stream:
+                chat_request["extra_headers"] = _with_identity_encoding(
+                    chat_request.get("extra_headers")
+                )
                 stream_response = await litellm.acompletion(**chat_request)
                 iterator = LiteLLMCompletionStreamingIterator(
                     model=litellm_model,
@@ -487,7 +617,7 @@ def create_v1_handlers(
                 if tracker is not None:
                     tracker.emit_end_stream(200, dict(resp.headers))
                 elapsed = time.monotonic() - start_time
-                logger.info(
+                logger.debug(
                     "V1 RESPONSES STREAM %s -> [%s] %s %.2fs",
                     original_model,
                     target_provider.name,
@@ -500,6 +630,7 @@ def create_v1_handlers(
                     stream_response,
                     is_stream=True,
                     client=client,
+                    model=mapped_model,
                 )
                 return resp
             else:
@@ -516,7 +647,7 @@ def create_v1_handlers(
                 else:
                     resp_body = str(result)
                 elapsed = time.monotonic() - start_time
-                logger.info(
+                logger.debug(
                     "V1 RESPONSES %s -> [%s] %s %.2fs",
                     original_model,
                     target_provider.name,
@@ -531,6 +662,7 @@ def create_v1_handlers(
                     completion_response,
                     is_stream=False,
                     client=client,
+                    model=mapped_model,
                 )
                 return web.Response(
                     text=resp_body,
@@ -565,4 +697,60 @@ def create_v1_handlers(
             )
             return web.json_response({"error": f"upstream error: {e}"}, status=502)
 
-    return v1_chat_completions, v1_responses
+    async def v1_list_models(request: web.Request) -> web.StreamResponse:
+        proxy_token, auth_err = _authenticate(request)
+        if auth_err:
+            return auth_err
+        entry = token_pool.get(proxy_token)
+        data = []
+        for row in get_site_models(db_conn, enabled_only=True):
+            if is_site_model_pattern(row["model"]):
+                continue
+            provider = _get_provider_by_name(cfg, row["provider"])
+            if provider is None:
+                continue
+            if entry is None or not entry.has_permission(provider):
+                continue
+            if not entry.has_model_permission(row["model"]):
+                continue
+            data.append(
+                {
+                    "id": row["model"],
+                    "object": "model",
+                    "created": 0,
+                    "owned_by": row["provider"],
+                }
+            )
+        return web.json_response({"object": "list", "data": data})
+
+    async def v1_get_model(request: web.Request) -> web.StreamResponse:
+        proxy_token, auth_err = _authenticate(request)
+        if auth_err:
+            return auth_err
+        name = request.match_info.get("model", "")
+        row = (
+            resolve_site_model_exact(db_conn, name)
+            if not is_site_model_pattern(name)
+            else None
+        )
+        provider = _get_provider_by_name(cfg, row["provider"]) if row else None
+        entry = token_pool.get(proxy_token)
+        visible = (
+            row is not None
+            and provider is not None
+            and entry is not None
+            and entry.has_permission(provider)
+            and entry.has_model_permission(row["model"])
+        )
+        if not visible:
+            return web.json_response({"error": f"model '{name}' not found"}, status=404)
+        return web.json_response(
+            {
+                "id": row["model"],
+                "object": "model",
+                "created": 0,
+                "owned_by": row["provider"],
+            }
+        )
+
+    return v1_chat_completions, v1_responses, v1_list_models, v1_get_model

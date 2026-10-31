@@ -15,11 +15,16 @@ from src.client_detect import detect_client
 from src.config import AppConfig, match_provider
 from src.db import (
     check_rate_limit,
+    compute_cost,
     get_client_usage_detail,
     get_global_client_hourly,
     get_global_client_summary,
+    get_pricing_map,
     get_provider_status,
+    get_rate_limit_status,
+    get_token_client_hourly,
     get_token_client_usage_detail,
+    get_token_usage_by_model,
     get_token_usage_detail,
     record_client_token_usage,
     record_client_usage,
@@ -58,6 +63,64 @@ _HOP_BY_HOP = frozenset(
 
 _STRIP_REQUEST_HEADERS = _HOP_BY_HOP | {"content-length"}
 
+_TRACKING_HEADERS = frozenset(
+    {
+        "x-session-id",
+        "x-zcode-trace-id",
+        "x-query-id",
+        "x-request-id",
+        "x-title",
+        "x-os-category",
+        "x-os-version",
+        "x-platform",
+        "x-client-timezone",
+        "x-client-language",
+        "x-release-channel",
+        "x-zcode-app-version",
+        "x-zcode-agent",
+        "x-zcode-session-type",
+        "x-app",
+        "http-referer",
+        "referer",
+        "x-forwarded-for",
+        "x-real-ip",
+        "x-forwarded-proto",
+        "x-forwarded-scheme",
+    }
+)
+
+_TRACKING_HEADER_PREFIXES = ("x-stainless-",)
+
+_TRACKING_BODY_KEYS = ("metadata", "user")
+
+
+def _apply_privacy_headers(headers: dict, ua_override: str) -> dict:
+    out: dict[str, str] = {}
+    for key, value in headers.items():
+        lk = key.lower()
+        if lk in _TRACKING_HEADERS or lk.startswith(_TRACKING_HEADER_PREFIXES):
+            continue
+        if lk == "user-agent" and ua_override:
+            continue
+        out[key] = value
+    if ua_override:
+        out["User-Agent"] = ua_override
+    return out
+
+
+def _strip_tracking_body(body: bytes | None) -> bytes | None:
+    if not body:
+        return body
+    try:
+        obj = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return body
+    if not isinstance(obj, dict) or not any(k in obj for k in _TRACKING_BODY_KEYS):
+        return body
+    for key in _TRACKING_BODY_KEYS:
+        obj.pop(key, None)
+    return json.dumps(obj, ensure_ascii=False).encode("utf-8")
+
 
 def _build_forward_headers(request: web.Request, strip_lower: frozenset[str]) -> dict:
     headers: dict[str, str] = {}
@@ -78,15 +141,45 @@ def _parse_request_model(body: bytes | None) -> str:
         return ""
 
 
+def _request_wants_stream(body: bytes | None) -> bool:
+    if not body:
+        return False
+    try:
+        obj = json.loads(body)
+    except Exception:
+        return False
+    return isinstance(obj, dict) and obj.get("stream") is True
+
+
 def _parse_iso(s: str) -> datetime:
     s = s.replace("Z", "+00:00")
     return datetime.fromisoformat(s)
 
 
-async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None):
-    entry = token_pool.get(token)
-    if not entry:
+async def _query_usage(token, token_pool, db_conn, cfg, start_str=None, end_str=None):
+    entry = token_pool.get(token) if token else None
+    if token and not entry:
         return None, "token not found in pool"
+
+    if token:
+        where = "WHERE token = ? AND ts >= ? AND ts < ?"
+        where_since = "WHERE token = ? AND ts >= ?"
+
+        def _params(start, end):
+            return (token, start, end)
+
+        def _params_since(start):
+            return (token, start)
+
+    else:
+        where = "WHERE ts >= ? AND ts < ?"
+        where_since = "WHERE ts >= ?"
+
+        def _params(start, end):
+            return (start, end)
+
+        def _params_since(start):
+            return (start,)
 
     now = datetime.now(timezone.utc)
     current_hour_ts = int(now.timestamp()) - (int(now.timestamp()) % 3600)
@@ -109,9 +202,10 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
 
     cur = db_conn.execute(
         "SELECT provider, ts - (ts % 3600) AS hour_ts, SUM(count) AS cnt "
-        "FROM success_log WHERE token = ? AND ts >= ? AND ts < ? "
-        "GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
-        (token, start_hour, end_hour + 3600),
+        "FROM success_log "
+        + where
+        + " GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
+        _params(start_hour, end_hour + 3600),
     )
     rows = cur.fetchall()
 
@@ -123,9 +217,10 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
         "SELECT provider, ts - (ts % 3600) AS hour_ts, "
         "SUM(input_tokens), SUM(output_tokens), "
         "SUM(cache_read), SUM(cache_write) "
-        "FROM token_usage_log WHERE token = ? AND ts >= ? AND ts < ? "
-        "GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
-        (token, start_hour, end_hour + 3600),
+        "FROM token_usage_log "
+        + where
+        + " GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
+        _params(start_hour, end_hour + 3600),
     )
     tok_rows = tok_cur.fetchall()
 
@@ -165,17 +260,14 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
         cutoff = int(now.timestamp()) - hours * 3600
         cutoff_hour = cutoff - (cutoff % 3600)
         row = db_conn.execute(
-            "SELECT COALESCE(SUM(count), 0) FROM success_log "
-            "WHERE token = ? AND ts >= ?",
-            (token, cutoff_hour),
+            "SELECT COALESCE(SUM(count), 0) FROM success_log " + where_since,
+            _params_since(cutoff_hour),
         ).fetchone()
         summary[label] = row[0]
 
     current_hour_rows = db_conn.execute(
-        "SELECT provider, SUM(count) FROM success_log "
-        "WHERE token = ? AND ts >= ? AND ts < ? "
-        "GROUP BY provider",
-        (token, current_hour_ts, current_hour_ts + 3600),
+        "SELECT provider, SUM(count) FROM success_log " + where + " GROUP BY provider",
+        _params(current_hour_ts, current_hour_ts + 3600),
     ).fetchall()
     current_hour = {
         "hour": datetime.fromtimestamp(current_hour_ts, tz=timezone.utc).strftime(
@@ -184,13 +276,50 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
         "by_provider": {r[0]: r[1] for r in current_hour_rows},
     }
 
-    tokens_by_provider = get_token_usage_detail(db_conn, token, start_ts, end_ts)
-    clients_summary = get_token_client_usage_detail(db_conn, token, start_ts, end_ts)
+    site_token = token if entry else None
+    tokens_by_provider = get_token_usage_detail(db_conn, site_token, start_ts, end_ts)
+    clients_summary = get_token_client_usage_detail(
+        db_conn, site_token, start_ts, end_ts
+    )
+    client_hourly_raw = get_token_client_hourly(db_conn, site_token, start_ts, end_ts)
+
+    models_breakdown = get_token_usage_by_model(db_conn, site_token, start_ts, end_ts)
+    pricing_map = get_pricing_map(db_conn)
+    total_cost = 0.0
+    for model_name, row in models_breakdown.items():
+        price_row = pricing_map.get(model_name)
+        if price_row:
+            cost = compute_cost(row, price_row)
+            row["cost"] = round(cost, 6)
+            total_cost += cost
+        else:
+            row["cost"] = None
+    has_priced = any(
+        models_breakdown[m].get("cost") is not None for m in models_breakdown
+    )
+
+    hourly_by_client: dict[str, dict[str, dict]] = {}
+    all_clients = set(client_hourly_raw)
+    t = start_hour
+    while t <= end_hour:
+        dt = datetime.fromtimestamp(t, tz=timezone.utc)
+        key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        hourly_by_client[key] = {}
+        for c_name in all_clients:
+            slot = client_hourly_raw.get(c_name, {}).get(t, {})
+            hourly_by_client[key][c_name] = {
+                "input": slot.get("input", 0),
+                "output": slot.get("output", 0),
+                "cache_read": slot.get("cache_read", 0),
+                "cache_write": slot.get("cache_write", 0),
+                "requests": slot.get("requests", 0),
+            }
+        t += 3600
 
     return {
-        "token": token,
-        "providers": entry.providers,
-        "describe": getattr(entry, "describe", ""),
+        "token": token or "",
+        "providers": (entry.providers if entry else [p.name for p in cfg.providers]),
+        "describe": getattr(entry, "describe", "") if entry else "",
         "current_hour": current_hour,
         "range": {
             "start": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -201,6 +330,10 @@ async def _query_usage(token, token_pool, db_conn, start_str=None, end_str=None)
         "hourly": hourly,
         "tokens": tokens_by_provider,
         "clients": clients_summary,
+        "hourly_by_client": hourly_by_client,
+        "limits": get_rate_limit_status(db_conn, entry) if entry else [],
+        "models": models_breakdown,
+        "total_cost": round(total_cost, 6) if has_priced else None,
     }, None
 
 
@@ -212,6 +345,7 @@ def create_handlers(
     session: aiohttp.ClientSession,
     start_time: float,
     monitor=None,
+    usage_monitor=None,
 ):
     async def serve_usage_page(request: web.Request) -> web.Response:
         html_path = os.path.join(STATIC_DIR, "usage.html")
@@ -227,13 +361,15 @@ def create_handlers(
             return web.json_response({"error": "invalid JSON"}, status=400)
 
         token = body.get("token")
-        if not token:
-            return web.json_response({"error": "missing token"}, status=400)
+        if token is not None and not isinstance(token, str):
+            return web.json_response({"error": "invalid token"}, status=400)
+        token = (token or "").strip()
 
         data, err = await _query_usage(
             token,
             token_pool,
             db_conn,
+            cfg,
             body.get("start"),
             body.get("end"),
         )
@@ -270,11 +406,14 @@ def create_handlers(
 
         headers = _build_forward_headers(request, _STRIP_REQUEST_HEADERS)
         headers["Host"] = provider.host
-        existing_xff = request.headers.get("X-Forwarded-For")
-        headers["X-Forwarded-For"] = (
-            f"{existing_xff}, {public_ip}" if existing_xff else public_ip
-        )
-        headers["X-Real-IP"] = public_ip
+        if cfg.privacy_strip_tracking:
+            headers = _apply_privacy_headers(headers, cfg.privacy_ua_override)
+        else:
+            existing_xff = request.headers.get("X-Forwarded-For")
+            headers["X-Forwarded-For"] = (
+                f"{existing_xff}, {public_ip}" if existing_xff else public_ip
+            )
+            headers["X-Real-IP"] = public_ip
 
         forbidden = False
         client = detect_client(request.headers)
@@ -311,20 +450,8 @@ def create_handlers(
 
         if proxy_token:
             token_entry = token_pool.get(proxy_token)
-            if token_entry and (
-                token_entry.rpm != -1
-                or token_entry.rph != -1
-                or token_entry.rpd != -1
-                or token_entry.rpt != -1
-            ):
-                allowed, triggered, quota_info = check_rate_limit(
-                    db_conn,
-                    proxy_token,
-                    token_entry.rpm,
-                    token_entry.rph,
-                    token_entry.rpd,
-                    token_entry.rpt,
-                )
+            if token_entry and token_entry.has_limits:
+                allowed, triggered, quota_info = check_rate_limit(db_conn, token_entry)
                 if not allowed:
                     return web.json_response(
                         {
@@ -336,8 +463,13 @@ def create_handlers(
                     )
 
         body = await request.read() if request.body_exists else None
+        if cfg.privacy_strip_tracking:
+            body = _strip_tracking_body(body)
+        if _request_wants_stream(body):
+            headers["Accept-Encoding"] = "identity"
 
         v1_override_provider = None
+        effective_model = ""
         if is_v1_route and proxy_token and body:
             model = _parse_request_model(body)
             if not model:
@@ -355,6 +487,7 @@ def create_handlers(
                     },
                     status=404,
                 )
+            effective_model = mapped_model
             for p in cfg.providers:
                 if p.name == mapped_provider_name:
                     v1_override_provider = p
@@ -375,6 +508,7 @@ def create_handlers(
             model = _parse_request_model(body)
             if model:
                 mapped, _ = resolve_model(db_conn, proxy_token, model)
+                effective_model = mapped
                 if mapped != model:
                     try:
                         obj = json.loads(body)
@@ -383,6 +517,8 @@ def create_handlers(
                         headers["Content-Length"] = str(len(body))
                     except Exception:
                         pass
+            else:
+                effective_model = ""
 
         effective_provider = v1_override_provider or provider
         if is_v1_route and v1_override_provider:
@@ -518,6 +654,19 @@ def create_handlers(
                                 )
                         else:
                             tin, tout, tcr, tcw = 0, 0, 0, 0
+                        if token_entry is not None:
+                            cr_w = (
+                                token_entry.cache_read_weight
+                                if token_entry.cache_read_weight >= 0
+                                else cfg.cache_read_weight
+                            )
+                            cw_w = (
+                                token_entry.cache_write_weight
+                                if token_entry.cache_write_weight >= 0
+                                else cfg.cache_write_weight
+                            )
+                        else:
+                            cr_w, cw_w = cfg.cache_read_weight, cfg.cache_write_weight
                         record_token_usage(
                             db_conn,
                             proxy_token,
@@ -526,6 +675,9 @@ def create_handlers(
                             tout,
                             tcr,
                             tcw,
+                            cr_w,
+                            cw_w,
+                            model=effective_model,
                         )
                         record_client_token_usage(
                             db_conn,
@@ -536,9 +688,33 @@ def create_handlers(
                             tout,
                             tcr,
                             tcw,
+                            model=effective_model,
                         )
+                        if usage_monitor is not None and usage_monitor.is_active(
+                            proxy_token
+                        ):
+                            now_ts = int(time.time())
+                            hour_ts = now_ts - (now_ts % 3600)
+                            hour_key = datetime.fromtimestamp(
+                                hour_ts, tz=timezone.utc
+                            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                            usage_monitor.notify_usage(
+                                proxy_token,
+                                {
+                                    "hour": hour_key,
+                                    "provider": effective_provider.name,
+                                    "client": client,
+                                    "model": effective_model,
+                                    "input": tin,
+                                    "output": tout,
+                                    "cache_read": tcr,
+                                    "cache_write": tcw,
+                                    "requests": 1,
+                                    "ts": now_ts,
+                                },
+                            )
                 record_status(db_conn, effective_provider.name, resp.status)
-                logger.info(
+                logger.debug(
                     "%s %s -> [%s] %s",
                     request.method,
                     request.path,
@@ -584,11 +760,19 @@ def create_handlers(
             return web.Response(text=f.read(), content_type="text/html")
 
     async def status_api_handler(request: web.Request) -> web.Response:
+        token = request.headers.get("X-Proxy-Token", "").strip()
+        if not token:
+            return web.json_response({"error": "missing X-Proxy-Token"}, status=401)
+        entry = token_pool.get(token)
+        if not entry or not entry.enabled:
+            return web.json_response({"error": "invalid or disabled token"}, status=403)
+
+        visible = [p for p in cfg.providers if entry.has_permission(p)]
         uptime = int(time.time() - start_time)
         stats = get_provider_status(db_conn)
 
         grouped: dict[str, dict] = {}
-        for p in cfg.providers:
+        for p in visible:
             real_token = cfg.real_tokens.get(p.name, "")
             key = f"{p.upstream}::{real_token}"
             if key not in grouped:
@@ -613,7 +797,7 @@ def create_handlers(
 
         merged_hourly: dict[str, list] = {}
         for pname, hourly_data in stats.get("hourly", {}).items():
-            for p in cfg.providers:
+            for p in visible:
                 real_token = cfg.real_tokens.get(p.name, "")
                 key = f"{p.upstream}::{real_token}"
                 if p.name == pname and key in grouped:
@@ -653,7 +837,7 @@ def create_handlers(
         for pname, period_data in stats.items():
             if pname == "hourly":
                 continue
-            for p in cfg.providers:
+            for p in visible:
                 real_token = cfg.real_tokens.get(p.name, "")
                 key = f"{p.upstream}::{real_token}"
                 if p.name == pname and key in grouped:
@@ -766,6 +950,95 @@ def create_handlers(
             }
         )
 
+    async def usage_stream_api(request: web.Request) -> web.Response:
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        token = (
+            body.get("token", "").strip() if isinstance(body.get("token"), str) else ""
+        )
+        if not token:
+            return web.json_response({"error": "missing token"}, status=400)
+        entry = token_pool.get(token)
+        if not entry:
+            return web.json_response({"error": "token not found in pool"}, status=404)
+        start = body.get("start")
+        end = body.get("end")
+        session_id = usage_monitor.create_session(token, start, end)
+        if not session_id:
+            return web.json_response({"error": "token not found in pool"}, status=404)
+        return web.json_response({"session_id": session_id})
+
+    async def usage_sse_handler(request: web.Request) -> web.StreamResponse:
+        sid = request.query.get("sid", "")
+        session = usage_monitor.sessions.get(sid) if usage_monitor else None
+        if not session:
+            return web.json_response({"error": "invalid session"}, status=403)
+
+        resp = web.StreamResponse(
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+        await resp.prepare(request)
+
+        data, err = await _query_usage(
+            session.token, token_pool, db_conn, cfg, session.start, session.end
+        )
+        snapshot = (
+            f"event: snapshot\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+            if not err
+            else f"event: error\ndata: {json.dumps({'error': err}, ensure_ascii=False)}\n\n"
+        )
+        try:
+            await resp.write(snapshot.encode("utf-8"))
+        except ConnectionError:
+            usage_monitor.remove_session(sid)
+            return resp
+
+        try:
+            await resp.write(b"event: connected\ndata: {}\n\n")
+        except ConnectionError:
+            usage_monitor.remove_session(sid)
+            return resp
+
+        async def keepalive():
+            while True:
+                await asyncio.sleep(15)
+                try:
+                    await resp.write(b": keepalive\n\n")
+                except ConnectionError:
+                    break
+
+        task = asyncio.ensure_future(keepalive())
+
+        try:
+            while True:
+                if task.done():
+                    break
+                try:
+                    chunk = await asyncio.wait_for(session.queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+                try:
+                    await resp.write(chunk)
+                except ConnectionError:
+                    break
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            usage_monitor.remove_session(sid)
+
+        return resp
+
     return (
         serve_usage_page,
         info_api_handler,
@@ -774,4 +1047,6 @@ def create_handlers(
         status_api_handler,
         serve_clients_page,
         clients_api_handler,
+        usage_stream_api,
+        usage_sse_handler,
     )
