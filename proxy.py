@@ -141,11 +141,11 @@ async def main():
 
     v1_list_models, v1_get_model = create_catalog_handlers(cfg, token_pool, db_conn)
 
-    async def v1_completions_removed(_request: web.Request) -> web.Response:
+    async def v1_responses_removed(_request: web.Request) -> web.Response:
         return web.json_response(
             {
-                "error": "v1 chat/responses endpoints were removed; "
-                "use a provider prefix such as /gjzq/ds/v1/chat/completions"
+                "error": "responses API is not served; "
+                "use /v1/chat/completions or a provider prefix"
             },
             status=410,
         )
@@ -195,10 +195,8 @@ async def main():
         return web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
     app.router.add_get("/", serve_index)
-    app.router.add_post("/v1/chat/completions", v1_completions_removed)
-    app.router.add_post("/v1/responses", v1_completions_removed)
-    app.router.add_post("/litellm/v1/chat/completions", v1_completions_removed)
-    app.router.add_post("/litellm/v1/responses", v1_completions_removed)
+    app.router.add_post("/v1/responses", v1_responses_removed)
+    app.router.add_post("/litellm/v1/responses", v1_responses_removed)
     app.router.add_route("*", "/{path:.*}", proxy_handler)
 
     runner = web.AppRunner(app)

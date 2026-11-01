@@ -17,11 +17,13 @@ from aiohttp.test_utils import AioHTTPTestCase
 
 from src.admin import create_admin_handlers
 from src.config import AppConfig, load_config
-from src.db import add_token, init_db
+from src.db import add_token, init_db, set_model_map, set_site_model
 from src.handlers import (
     _apply_privacy_headers,
     _request_wants_stream,
+    _resolve_v1_target,
     _strip_tracking_body,
+    _v1_target_url,
     create_handlers,
 )
 from src.models import Provider, TokenEntry
@@ -748,6 +750,106 @@ class TestStreamKeepaliveProxy(AioHTTPTestCase):
         assert body.count(b": ping\n\n") >= 1
         assert b"data: [DONE]" not in body
         assert elapsed < 1.9
+
+
+class TestV1TargetUrl(unittest.TestCase):
+    def _big_provider(self) -> Provider:
+        return Provider(
+            "big",
+            "/",
+            "https://open.bigmodel.cn",
+            False,
+            v1_base="https://open.bigmodel.cn/api/paas/v4",
+        )
+
+    def test_v1_base_used(self):
+        provider = self._big_provider()
+        assert (
+            _v1_target_url(provider, "/v1/chat/completions", 0)
+            == "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        )
+
+    def test_upstream_without_v1_appends_v1(self):
+        provider = Provider("kimi", "/kimi", "https://api.kimi.com", True)
+        assert (
+            _v1_target_url(provider, "/v1/chat/completions", 0)
+            == "https://api.kimi.com/v1/chat/completions"
+        )
+
+    def test_upstream_ending_with_v1_not_duplicated(self):
+        provider = Provider("x", "/x", "https://x.example/v1", True)
+        assert (
+            _v1_target_url(provider, "/v1/chat/completions", 0)
+            == "https://x.example/v1/chat/completions"
+        )
+
+    def test_litellm_prefix_same_result(self):
+        provider = self._big_provider()
+        assert (
+            _v1_target_url(provider, "/litellm/v1/chat/completions", 0)
+            == "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        )
+
+    def test_v1_base_trailing_slash(self):
+        provider = Provider(
+            "big",
+            "/",
+            "https://open.bigmodel.cn",
+            False,
+            v1_base="https://open.bigmodel.cn/api/paas/v4/",
+        )
+        assert (
+            _v1_target_url(provider, "/v1/chat/completions", 0)
+            == "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        )
+
+
+class TestV1ModelMapping(unittest.TestCase):
+    def setUp(self):
+        self.conn, _ = init_db(":memory:")
+        self.cfg = AppConfig(
+            providers=[
+                Provider("first", "/fx", "https://first.example", True),
+                Provider(
+                    "default",
+                    "/",
+                    "https://open.bigmodel.cn",
+                    False,
+                    v1_base="https://open.bigmodel.cn/api/paas/v4",
+                ),
+                Provider("ds", "/ds", "https://gpt.gjzq.cn/prod-api", True),
+            ]
+        )
+        self.first = self.cfg.providers[0]
+        self.big = self.cfg.providers[1]
+        self.ds = self.cfg.providers[2]
+        self.token = _make_token_full()
+        add_token(self.conn, self.token, ["*"])
+
+    def tearDown(self):
+        self.conn.close()
+
+    def test_token_model_map_hit(self):
+        set_model_map(self.conn, self.token, "gpt-4", "glm-4-plus", "ds")
+        mapped, provider = _resolve_v1_target(self.conn, self.cfg, self.token, "gpt-4")
+        assert mapped == "glm-4-plus"
+        assert provider is self.ds
+
+    def test_site_model_pattern_fallback(self):
+        set_site_model(self.conn, "glm-*", "default", "glm-5.3")
+        mapped, provider = _resolve_v1_target(
+            self.conn, self.cfg, self.token, "glm-5.2"
+        )
+        assert mapped == "glm-5.3"
+        assert provider is self.big
+
+    def test_no_match_falls_back_to_default_provider(self):
+        mapped, provider = _resolve_v1_target(
+            self.conn, self.cfg, self.token, "totally-unknown"
+        )
+        assert mapped == "totally-unknown"
+        assert provider is self.big
+        assert provider is not self.first
 
 
 if __name__ == "__main__":

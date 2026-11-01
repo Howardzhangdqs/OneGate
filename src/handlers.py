@@ -33,6 +33,7 @@ from src.db import (
     record_token_usage,
     record_usage,
     resolve_model,
+    resolve_site_model_pattern,
 )
 from src.log import save_log, save_log_headers_only
 from src.models import TokenEntry
@@ -140,6 +141,43 @@ def _parse_request_model(body: bytes | None) -> str:
         return obj.get("model", "")
     except Exception:
         return ""
+
+
+def _resolve_v1_target(db_conn, cfg, proxy_token: str, model: str):
+    mapped_model, provider_name = resolve_model(db_conn, proxy_token, model)
+    if mapped_model == model and not provider_name:
+        row = resolve_site_model_pattern(db_conn, model)
+        if row:
+            mapped_model = row["target"] or model
+            provider_name = row["provider"]
+    provider = None
+    if provider_name:
+        for p in cfg.providers:
+            if p.name == provider_name:
+                provider = p
+                break
+    if provider is None and cfg.providers:
+        provider = next(
+            (p for p in cfg.providers if p.name == "default"),
+            cfg.providers[0],
+        )
+    return mapped_model, provider
+
+
+def _v1_target_url(provider, request_path: str, intercept_port: int) -> str:
+    if request_path.startswith("/litellm/v1"):
+        v1_path = request_path[len("/litellm/v1") :] or "/"
+    elif request_path.startswith("/v1"):
+        v1_path = request_path[len("/v1") :] or "/"
+    else:
+        v1_path = request_path
+    if intercept_port:
+        return f"http://127.0.0.1:{intercept_port}{provider.upstream_path}{v1_path}"
+    if provider.v1_base:
+        return provider.v1_base.rstrip("/") + v1_path
+    if provider.upstream.endswith("/v1"):
+        return provider.upstream + v1_path
+    return provider.upstream.rstrip("/") + "/v1" + v1_path
 
 
 def _request_wants_stream(body: bytes | None) -> bool:
@@ -392,7 +430,9 @@ def create_handlers(
             if fnmatch.fnmatch(ua, pattern):
                 return web.json_response({"error": "forbidden"}, status=403)
 
-        is_v1_route = request.path.startswith("/v1/")
+        is_v1_route = request.path.startswith("/v1/") or request.path.startswith(
+            "/litellm/v1/"
+        )
         provider = match_provider(cfg.providers, request.path)
         if not provider:
             return web.json_response({"error": "no provider matched"}, status=502)
@@ -477,30 +517,30 @@ def create_handlers(
                 return web.json_response(
                     {"error": "model not found in request body"}, status=400
                 )
-            mapped_model, mapped_provider_name = resolve_model(
-                db_conn, proxy_token, model
+            mapped_model, v1_override_provider = _resolve_v1_target(
+                db_conn, cfg, proxy_token, model
             )
-            if mapped_model == model and not mapped_provider_name:
-                return web.json_response(
-                    {
-                        "error": f"model '{model}' not found in mapping rules",
-                        "model": model,
-                    },
-                    status=404,
-                )
             effective_model = mapped_model
-            for p in cfg.providers:
-                if p.name == mapped_provider_name:
-                    v1_override_provider = p
-                    break
-            if v1_override_provider:
-                try:
-                    obj = json.loads(body)
-                    obj["model"] = mapped_model
-                    body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-                    headers["Content-Length"] = str(len(body))
-                except Exception:
-                    pass
+            if v1_override_provider is not None:
+                token_entry = token_pool.get(proxy_token)
+                if token_entry is not None and not token_entry.has_permission(
+                    v1_override_provider
+                ):
+                    return web.json_response(
+                        {
+                            "error": "token not authorized for provider "
+                            f"'{v1_override_provider.name}'"
+                        },
+                        status=403,
+                    )
+                if mapped_model != model:
+                    try:
+                        obj = json.loads(body)
+                        obj["model"] = mapped_model
+                        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+                        headers["Content-Length"] = str(len(body))
+                    except Exception:
+                        pass
                 real_token = cfg.real_tokens.get(v1_override_provider.name, "")
                 if real_token:
                     headers["Authorization"] = f"Bearer {real_token}"
@@ -523,21 +563,9 @@ def create_handlers(
 
         effective_provider = v1_override_provider or provider
         if is_v1_route and v1_override_provider:
-            v1_path = path
-            if v1_path.startswith("/v1"):
-                v1_path = v1_path[3:] or "/"
-            if cfg.intercept_port:
-                target_url = (
-                    f"http://127.0.0.1:{cfg.intercept_port}"
-                    + effective_provider.upstream_path
-                    + v1_path
-                )
-            else:
-                target_url = (
-                    effective_provider.origin
-                    + effective_provider.upstream_path
-                    + v1_path
-                )
+            target_url = _v1_target_url(
+                effective_provider, request.path, cfg.intercept_port
+            )
         else:
             if cfg.intercept_port:
                 target_url = (
