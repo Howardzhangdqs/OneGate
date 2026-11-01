@@ -24,9 +24,15 @@ from src.db import (
 )
 from src.models import Provider, TokenEntry
 from src.pool import resolve_token
+from src.stream_proxy import pump_stream
 from src.throughput import make_tracker
 
 _V1_PRIVACY_SKIP = frozenset({"user", "metadata", "extra_headers"})
+
+_V1_IDLE_TIMEOUT_FRAME = (
+    b'data: {"error":{"message":"upstream stream idle timeout",'
+    b'"type":"upstream_idle_timeout"}}\n\n'
+)
 
 logger = logging.getLogger(__name__)
 
@@ -372,24 +378,39 @@ def create_v1_handlers(
                     },
                 )
                 await resp.prepare(request)
-                async for chunk in response:
-                    line = chunk.model_dump_json(exclude_none=True)
-                    data = f"data: {line}\n\n".encode("utf-8")
+
+                async def _chat_frames():
+                    async for chunk in response:
+                        line = chunk.model_dump_json(exclude_none=True)
+                        yield f"data: {line}\n\n".encode("utf-8")
+                    yield b"data: [DONE]\n\n"
+
+                def _feed_chunk(data: bytes) -> None:
                     if tracker is not None:
                         tracker.feed_chunk(data, "text/event-stream")
-                    await resp.write(data)
-                await resp.write(b"data: [DONE]\n\n")
-                await resp.write_eof()
-                if tracker is not None:
-                    tracker.emit_end_stream(200, dict(resp.headers))
-                _record_v1_usage(
-                    proxy_token,
-                    target_provider.name,
-                    response,
-                    is_stream=True,
-                    client=client,
-                    model=mapped_model,
+
+                pump_result = await pump_stream(
+                    resp,
+                    _chat_frames(),
+                    heartbeat_interval=cfg.timeout_stream_heartbeat,
+                    idle_timeout=cfg.timeout_stream_idle,
+                    on_idle_timeout=lambda: _V1_IDLE_TIMEOUT_FRAME,
+                    on_chunk=_feed_chunk,
                 )
+                if tracker is not None:
+                    tracker.emit_end_stream(
+                        504 if pump_result == "idle_timeout" else 200,
+                        dict(resp.headers),
+                    )
+                if pump_result != "idle_timeout":
+                    _record_v1_usage(
+                        proxy_token,
+                        target_provider.name,
+                        response,
+                        is_stream=True,
+                        client=client,
+                        model=mapped_model,
+                    )
                 return resp
             else:
                 response = await litellm.acompletion(
@@ -602,20 +623,37 @@ def create_v1_handlers(
                     },
                 )
                 await resp.prepare(request)
-                async for event in iterator:
-                    if hasattr(event, "model_dump"):
-                        data = f"data: {event.model_dump_json()}\n\n".encode("utf-8")
-                    elif isinstance(event, dict):
-                        data = f"data: {json.dumps(event)}\n\n".encode("utf-8")
-                    else:
-                        data = f"data: {json.dumps(str(event))}\n\n".encode("utf-8")
+
+                async def _event_frames():
+                    async for event in iterator:
+                        if hasattr(event, "model_dump"):
+                            data = f"data: {event.model_dump_json()}\n\n".encode(
+                                "utf-8"
+                            )
+                        elif isinstance(event, dict):
+                            data = f"data: {json.dumps(event)}\n\n".encode("utf-8")
+                        else:
+                            data = f"data: {json.dumps(str(event))}\n\n".encode("utf-8")
+                        yield data
+                    yield b"data: [DONE]\n\n"
+
+                def _feed_chunk(data: bytes) -> None:
                     if tracker is not None:
                         tracker.feed_chunk(data, "text/event-stream")
-                    await resp.write(data)
-                await resp.write(b"data: [DONE]\n\n")
-                await resp.write_eof()
+
+                pump_result = await pump_stream(
+                    resp,
+                    _event_frames(),
+                    heartbeat_interval=cfg.timeout_stream_heartbeat,
+                    idle_timeout=cfg.timeout_stream_idle,
+                    on_idle_timeout=lambda: _V1_IDLE_TIMEOUT_FRAME,
+                    on_chunk=_feed_chunk,
+                )
                 if tracker is not None:
-                    tracker.emit_end_stream(200, dict(resp.headers))
+                    tracker.emit_end_stream(
+                        504 if pump_result == "idle_timeout" else 200,
+                        dict(resp.headers),
+                    )
                 elapsed = time.monotonic() - start_time
                 logger.debug(
                     "V1 RESPONSES STREAM %s -> [%s] %s %.2fs",
@@ -624,14 +662,15 @@ def create_v1_handlers(
                     200,
                     elapsed,
                 )
-                _record_v1_usage(
-                    proxy_token,
-                    target_provider.name,
-                    stream_response,
-                    is_stream=True,
-                    client=client,
-                    model=mapped_model,
-                )
+                if pump_result != "idle_timeout":
+                    _record_v1_usage(
+                        proxy_token,
+                        target_provider.name,
+                        stream_response,
+                        is_stream=True,
+                        client=client,
+                        model=mapped_model,
+                    )
                 return resp
             else:
                 completion_response = await litellm.acompletion(**chat_request)

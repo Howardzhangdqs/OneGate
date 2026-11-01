@@ -25,6 +25,8 @@ class AppConfig:
     timeout_total: int = 1800
     timeout_connect: int = 30
     timeout_sock_read: int = 900
+    timeout_stream_idle: float = 60.0
+    timeout_stream_heartbeat: float = 10.0
     banned_ips: list[str] = field(default_factory=list)
     banned_uas: list[str] = field(default_factory=list)
     decompress_log: bool = True
@@ -53,6 +55,10 @@ def load_config(config_dir: str | None = None) -> AppConfig:
         cfg.timeout_total = int(os.environ.get("TIMEOUT_TOTAL", "1800"))
         cfg.timeout_connect = int(os.environ.get("TIMEOUT_CONNECT", "30"))
         cfg.timeout_sock_read = int(os.environ.get("TIMEOUT_SOCK_READ", "900"))
+        cfg.timeout_stream_idle = float(os.environ.get("TIMEOUT_STREAM_IDLE", "60.0"))
+        cfg.timeout_stream_heartbeat = float(
+            os.environ.get("TIMEOUT_STREAM_HEARTBEAT", "10.0")
+        )
         real = os.environ.get("REAL_TOKEN", "")
         if real:
             cfg.real_tokens["default"] = real
@@ -70,12 +76,24 @@ def load_config(config_dir: str | None = None) -> AppConfig:
     env_total = os.environ.get("TIMEOUT_TOTAL")
     env_connect = os.environ.get("TIMEOUT_CONNECT")
     env_sock_read = os.environ.get("TIMEOUT_SOCK_READ")
+    env_stream_idle = os.environ.get("TIMEOUT_STREAM_IDLE")
+    env_stream_heartbeat = os.environ.get("TIMEOUT_STREAM_HEARTBEAT")
     cfg.timeout_total = int(env_total) if env_total else timeout_cfg.get("total", 1800)
     cfg.timeout_connect = (
         int(env_connect) if env_connect else timeout_cfg.get("connect", 30)
     )
     cfg.timeout_sock_read = (
         int(env_sock_read) if env_sock_read else timeout_cfg.get("sock_read", 900)
+    )
+    cfg.timeout_stream_idle = (
+        float(env_stream_idle)
+        if env_stream_idle
+        else float(timeout_cfg.get("stream_idle", 60.0))
+    )
+    cfg.timeout_stream_heartbeat = (
+        float(env_stream_heartbeat)
+        if env_stream_heartbeat
+        else float(timeout_cfg.get("stream_heartbeat", 10.0))
     )
 
     compression_cfg = data.get("compression", {})

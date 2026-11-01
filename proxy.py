@@ -64,7 +64,11 @@ async def main():
         sock_connect=cfg.timeout_connect,
         sock_read=cfg.timeout_sock_read,
     )
-    connector = aiohttp.TCPConnector(ssl=ssl.create_default_context())
+    connector = aiohttp.TCPConnector(
+        ssl=ssl.create_default_context(),
+        enable_cleanup_closed=True,
+        keepalive_timeout=10,
+    )
     session = aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
