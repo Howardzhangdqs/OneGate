@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import asyncio
 import json
 import os
 import ssl
@@ -659,6 +660,94 @@ class TestStreamAcceptEncodingProxy(AioHTTPTestCase):
         assert resp.status == 200
         h = {k.lower(): v for k, v in self.captured["headers"].items()}
         assert h.get("accept-encoding") == "gzip"
+
+
+class TestStreamKeepaliveProxy(AioHTTPTestCase):
+    async def get_application(self):
+        async def upstream_handler(request):
+            resp = web.StreamResponse(
+                status=200, headers={"Content-Type": "text/event-stream"}
+            )
+            await resp.prepare(request)
+            try:
+                await resp.write(b"data: hello\n\n")
+            except ConnectionResetError:
+                return resp
+            await asyncio.sleep(2)
+            try:
+                await resp.write(b"data: [DONE]\n\n")
+                await resp.write_eof()
+            except ConnectionResetError:
+                pass
+            return resp
+
+        upstream_app = web.Application()
+        upstream_app.router.add_post("/api/chat", upstream_handler)
+        self.upstream_runner = web.AppRunner(upstream_app)
+        await self.upstream_runner.setup()
+        site = web.TCPSite(self.upstream_runner, "127.0.0.1", 0)
+        await site.start()
+        port = self.upstream_runner.addresses[0][1]
+
+        self.cfg = AppConfig(
+            bind_port=0,
+            usage_db=":memory:",
+            providers=[Provider("mock", "/", f"http://127.0.0.1:{port}", False)],
+            real_tokens={"mock": "real-key"},
+            timeout_stream_heartbeat=0.3,
+            timeout_stream_idle=0.9,
+        )
+        self.db_conn, _ = init_db(":memory:")
+        self.token = _make_token_full()
+        add_token(self.db_conn, self.token, ["*"])
+        self.token_pool = {self.token: TokenEntry(self.token, ["*"])}
+        self.public_ip = "1.2.3.4"
+
+        timeout = aiohttp.ClientTimeout(total=30, sock_connect=5, sock_read=10)
+        self.session = aiohttp.ClientSession(
+            timeout=timeout,
+            skip_auto_headers={"User-Agent"},
+        )
+
+        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+            self.cfg,
+            self.token_pool,
+            self.db_conn,
+            self.public_ip,
+            self.session,
+            time.time(),
+        )
+
+        app = web.Application()
+        app.router.add_route("*", "/{path:.*}", proxy_handler)
+        return app
+
+    async def asyncTearDown(self):
+        await self.session.close()
+        await self.upstream_runner.cleanup()
+
+    async def test_sse_idle_stream_gets_pings_and_closes(self):
+        async def collect():
+            resp = await self.client.post(
+                "/api/chat",
+                headers={"Authorization": f"Bearer {self.token}"},
+                json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+            )
+            assert resp.status == 200
+            assert "text/event-stream" in resp.headers.get("Content-Type", "")
+            chunks = []
+            async for chunk in resp.content.iter_any():
+                chunks.append(chunk)
+            return b"".join(chunks)
+
+        started = time.monotonic()
+        body = await asyncio.wait_for(collect(), timeout=5)
+        elapsed = time.monotonic() - started
+
+        assert b"data: hello" in body
+        assert body.count(b": ping\n\n") >= 1
+        assert b"data: [DONE]" not in body
+        assert elapsed < 1.9
 
 
 if __name__ == "__main__":

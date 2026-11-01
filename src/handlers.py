@@ -37,6 +37,7 @@ from src.db import (
 from src.log import save_log, save_log_headers_only
 from src.models import TokenEntry
 from src.pool import resolve_token
+from src.stream_proxy import pump_stream
 from src.throughput import (
     _extract_usage_from_json,
     _extract_usage_from_sse,
@@ -586,25 +587,48 @@ def create_handlers(
                 await response.prepare(request)
 
                 resp_chunks = []
-                usage_buf = b"" if tracker is None else None
-                async for chunk in resp.content.iter_any():
+                usage_parts: list[bytes] | None = [] if tracker is None else None
+                usage_len = 0
+
+                def _on_proxy_chunk(chunk: bytes) -> None:
+                    nonlocal usage_len
                     if cfg.enable_log and cfg.log_format == "full":
                         resp_chunks.append(chunk)
 
                     if tracker is not None:
                         tracker.feed_chunk(chunk, ct)
-                    elif usage_buf is not None and len(usage_buf) < _USAGE_BUF_LIMIT:
-                        usage_buf += chunk
+                    elif usage_parts is not None and usage_len < _USAGE_BUF_LIMIT:
+                        usage_parts.append(chunk)
+                        usage_len += len(chunk)
 
-                    await response.write(chunk)
+                if "text/event-stream" in ct:
+                    stream_started = time.monotonic()
+                    pump_result = await pump_stream(
+                        response,
+                        resp.content.iter_any(),
+                        heartbeat_interval=cfg.timeout_stream_heartbeat,
+                        idle_timeout=cfg.timeout_stream_idle,
+                        on_chunk=_on_proxy_chunk,
+                    )
+                    if pump_result == "idle_timeout":
+                        logger.warning(
+                            "SSE stream closed after idle timeout %.1fs: provider=%s path=%s",
+                            time.monotonic() - stream_started,
+                            effective_provider.name,
+                            request.path,
+                        )
+                else:
+                    async for chunk in resp.content.iter_any():
+                        _on_proxy_chunk(chunk)
+                        await response.write(chunk)
 
-                await response.write_eof()
+                    await response.write_eof()
 
                 if tracker is not None:
                     if tracker.is_stream:
                         tracker.emit_end_stream(resp.status, resp_headers)
                     else:
-                        full_resp = b"".join(tracker.chunks)
+                        full_resp = tracker.buffered_body
                         tracker.feed_non_stream_response(
                             full_resp, resp.status, resp_headers
                         )
@@ -643,7 +667,8 @@ def create_handlers(
                         record_success(db_conn, proxy_token, effective_provider.name)
                         if tracker is not None:
                             tin, tout, tcr, tcw = tracker.final_usage
-                        elif usage_buf:
+                        elif usage_parts:
+                            usage_buf = b"".join(usage_parts)
                             if "text/event-stream" in ct:
                                 tin, tout, tcr, tcw = _extract_usage_from_sse(
                                     usage_buf.decode("utf-8", errors="replace")
@@ -975,6 +1000,7 @@ def create_handlers(
         session = usage_monitor.sessions.get(sid) if usage_monitor else None
         if not session:
             return web.json_response({"error": "invalid session"}, status=403)
+        session.attached = True
 
         resp = web.StreamResponse(
             status=200,

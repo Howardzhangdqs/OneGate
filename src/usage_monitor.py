@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+SESSION_ORPHAN_TTL = 120.0
+SESSION_SWEEP_INTERVAL = 30.0
+
 
 @dataclass
 class UsageSession:
@@ -18,6 +21,7 @@ class UsageSession:
     end: str | None
     queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=256))
     created_at: float = field(default_factory=time.time)
+    attached: bool = False
 
 
 class UsageMonitor:
@@ -25,8 +29,10 @@ class UsageMonitor:
         self.token_pool = token_pool
         self.sessions: dict[str, UsageSession] = {}
         self.token_sessions: dict[str, set[str]] = {}
+        self._last_sweep = 0.0
 
     def is_active(self, token: str | None) -> bool:
+        self._sweep_sessions()
         if not token:
             return False
         return bool(self.token_sessions.get(token))
@@ -34,6 +40,7 @@ class UsageMonitor:
     def create_session(
         self, token: str, start: str | None = None, end: str | None = None
     ) -> str | None:
+        self._sweep_sessions()
         entry = self.token_pool.get(token)
         if not entry:
             return None
@@ -47,6 +54,15 @@ class UsageMonitor:
             token[:8],
         )
         return session_id
+
+    def _sweep_sessions(self) -> None:
+        now = time.time()
+        if now - self._last_sweep < SESSION_SWEEP_INTERVAL:
+            return
+        self._last_sweep = now
+        for session in list(self.sessions.values()):
+            if not session.attached and now - session.created_at > SESSION_ORPHAN_TTL:
+                self.remove_session(session.session_id)
 
     def remove_session(self, session_id: str) -> None:
         session = self.sessions.pop(session_id, None)

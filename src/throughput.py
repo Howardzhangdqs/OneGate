@@ -18,6 +18,9 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
 CHUNK_INTERVAL = 0.3
 BODY_LIMIT = 100 * 1024
+MAX_TRACK_BODY = 4 * 1024 * 1024
+SESSION_ORPHAN_TTL = 120.0
+SESSION_SWEEP_INTERVAL = 30.0
 _SENSITIVE_HEADERS = frozenset(
     {
         "authorization",
@@ -40,6 +43,7 @@ class StreamSession:
     token: str
     queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=256))
     created_at: float = field(default_factory=time.time)
+    attached: bool = False
 
 
 class ThroughputMonitor:
@@ -47,13 +51,16 @@ class ThroughputMonitor:
         self.token_pool = token_pool
         self.sessions: dict[str, StreamSession] = {}
         self.token_sessions: dict[str, set[str]] = {}
+        self._last_sweep = 0.0
 
     def is_active(self, token: str | None) -> bool:
+        self._sweep_sessions()
         if not token:
             return False
         return bool(self.token_sessions.get(token))
 
     def create_session(self, token: str) -> str | None:
+        self._sweep_sessions()
         entry = self.token_pool.get(token)
         if not entry:
             return None
@@ -67,6 +74,15 @@ class ThroughputMonitor:
             token[:8],
         )
         return session_id
+
+    def _sweep_sessions(self) -> None:
+        now = time.time()
+        if now - self._last_sweep < SESSION_SWEEP_INTERVAL:
+            return
+        self._last_sweep = now
+        for session in list(self.sessions.values()):
+            if not session.attached and now - session.created_at > SESSION_ORPHAN_TTL:
+                self.remove_session(session.session_id)
 
     def remove_session(self, session_id: str) -> None:
         session = self.sessions.pop(session_id, None)
@@ -133,6 +149,7 @@ def create_throughput_handlers(monitor: ThroughputMonitor, token_pool: dict, db_
         session = monitor.sessions.get(sid)
         if not session:
             return web.json_response({"error": "invalid session"}, status=403)
+        session.attached = True
 
         resp = web.StreamResponse(
             status=200,
@@ -256,6 +273,10 @@ class ThroughputTracker:
         self.input_is_inclusive = False
 
         self.chunks: list[bytes] = []
+        self.display_len = 0
+        self.body_chunks: list[bytes] = []
+        self.body_len = 0
+        self.body_truncated = False
 
         self.req_body = ""
         self.req_body_truncated = False
@@ -270,6 +291,12 @@ class ThroughputTracker:
     @property
     def active(self) -> bool:
         return bool(self.proxy_token) and self.monitor.is_active(self.proxy_token)
+
+    @property
+    def buffered_body(self) -> bytes:
+        if self.body_truncated:
+            return b""
+        return b"".join(self.body_chunks)
 
     @property
     def final_usage(self) -> tuple[int, int, int, int]:
@@ -303,7 +330,15 @@ class ThroughputTracker:
     def feed_chunk(self, chunk: bytes, content_type: str = "") -> None:
         if not self.active:
             return
-        self.chunks.append(chunk)
+        if self.display_len < BODY_LIMIT:
+            self.chunks.append(chunk)
+            self.display_len += len(chunk)
+        if "text/event-stream" not in content_type:
+            if self.body_len < MAX_TRACK_BODY:
+                self.body_chunks.append(chunk)
+                self.body_len += len(chunk)
+            else:
+                self.body_truncated = True
         self._parse_stream_chunk(chunk, content_type)
         if not self.is_stream:
             return
@@ -332,7 +367,6 @@ class ThroughputTracker:
     ) -> None:
         if not self.active:
             return
-        self.chunks = [body] if body else []
         elapsed_ms = (time.monotonic() - self.start_mono) * 1000
         pi, po, cr, cw = _extract_usage_from_json(body)
         if pi:
@@ -439,6 +473,8 @@ class ThroughputTracker:
             self.is_stream = True
         if not self.is_stream:
             return
+        if len(self.line_buf) > MAX_TRACK_BODY:
+            self.line_buf = ""
         self.line_buf += chunk.decode("utf-8", errors="replace")
         while "\n" in self.line_buf:
             line, self.line_buf = self.line_buf.split("\n", 1)
