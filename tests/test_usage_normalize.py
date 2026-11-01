@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -113,54 +112,3 @@ class TestExtractCacheFromUsage:
 
     def test_empty(self):
         assert _extract_cache_from_usage({}) == (0, 0)
-
-
-class TestLitellmUsageToTuple:
-    def test_litellm_subtracts_cache_read(self):
-        from src.v1_handler import _litellm_usage_to_tuple
-
-        usage = SimpleNamespace(
-            prompt_tokens=1000,
-            completion_tokens=50,
-            _cache_read_input_tokens=300,
-            _cache_creation_input_tokens=0,
-            prompt_tokens_details=None,
-        )
-        inp, out, cr, cw = _litellm_usage_to_tuple(usage)
-        assert inp == 700
-        assert out == 50
-        assert cr == 300
-        assert cw == 0
-
-    def test_litellm_clamps_when_cache_exceeds_prompt(self):
-        from src.v1_handler import _litellm_usage_to_tuple
-
-        usage = SimpleNamespace(
-            prompt_tokens=100,
-            completion_tokens=10,
-            _cache_read_input_tokens=500,
-            _cache_creation_input_tokens=0,
-            prompt_tokens_details=None,
-        )
-        inp, out, cr, cw = _litellm_usage_to_tuple(usage)
-        assert inp == 0
-        assert cr == 500
-
-    def test_litellm_none_usage(self):
-        from src.v1_handler import _litellm_usage_to_tuple
-
-        assert _litellm_usage_to_tuple(None) == (0, 0, 0, 0)
-
-    def test_litellm_no_cache(self):
-        from src.v1_handler import _litellm_usage_to_tuple
-
-        usage = SimpleNamespace(
-            prompt_tokens=1000,
-            completion_tokens=50,
-            _cache_read_input_tokens=0,
-            _cache_creation_input_tokens=0,
-            prompt_tokens_details=None,
-        )
-        inp, out, cr, cw = _litellm_usage_to_tuple(usage)
-        assert inp == 1000
-        assert cr == 0

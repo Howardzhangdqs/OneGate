@@ -19,16 +19,13 @@ from src.db import (
     get_site_models,
     get_token,
     init_db,
-    resolve_model,
-    resolve_model_ex,
     resolve_site_model,
-    set_model_map,
     set_site_model,
     update_token,
 )
 from src.models import Provider
 from src.pool import load_pool_from_db
-from src.v1_handler import _resolve_v1_mapping, create_v1_handlers
+from src.model_catalog import create_catalog_handlers
 
 ALL_TOKEN = f"{'a' * 32}.AAAAAAAAAAAAAAAA"
 LIMITED_TOKEN = f"{'b' * 32}.BBBBBBBBBBBBBBBB"
@@ -94,48 +91,6 @@ class TestSiteModelDB(unittest.TestCase):
         finally:
             conn.close()
 
-    def test_token_mapping_beats_site_mapping(self):
-        conn = _conn()
-        try:
-            set_model_map(conn, "tok.one", "gpt-*", "token-target", "glm")
-            set_site_model(conn, "gpt-4", "oai", "site-target")
-
-            target, provider, matched = resolve_model_ex(conn, "tok.one", "gpt-4")
-            assert (target, provider, matched) == ("token-target", "glm", True)
-
-            target, provider = resolve_model(conn, "tok.one", "gpt-4")
-            assert (target, provider) == ("token-target", "glm")
-        finally:
-            conn.close()
-
-    def test_site_mapping_used_when_no_token_rule(self):
-        conn = _conn()
-        try:
-            set_site_model(conn, "gpt-4", "oai", "site-target")
-            target, provider, matched = resolve_model_ex(conn, "tok.other", "gpt-4")
-            assert (target, provider, matched) == ("gpt-4", "", False)
-
-            row = resolve_site_model(conn, "gpt-4")
-            assert row is not None
-            assert row["provider"] == "oai"
-            assert row["target"] == "site-target"
-
-            cfg = AppConfig(
-                providers=[
-                    Provider("glm", "/glm", "https://glm.example", True),
-                    Provider("oai", "/oai", "https://oai.example", True),
-                ]
-            )
-            mapped, target_provider, original, token_matched = _resolve_v1_mapping(
-                conn, cfg, "tok.other", "gpt-4"
-            )
-            assert mapped == "site-target"
-            assert target_provider.name == "oai"
-            assert original == "gpt-4"
-            assert token_matched is False
-        finally:
-            conn.close()
-
     def test_site_model_filtering_and_delete(self):
         conn = _conn()
         try:
@@ -181,12 +136,9 @@ class TestV1ModelsEndpoint(AioHTTPTestCase):
 
         self.token_pool = load_pool_from_db(self.db_conn)
 
-        (
-            _,
-            _,
-            v1_list_models,
-            v1_get_model,
-        ) = create_v1_handlers(self.cfg, self.token_pool, self.db_conn)
+        v1_list_models, v1_get_model = create_catalog_handlers(
+            self.cfg, self.token_pool, self.db_conn
+        )
         (
             _,
             admin_list_models,

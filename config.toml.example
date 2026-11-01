@@ -3,12 +3,10 @@ intercept_port = 0
 enable_log = false
 # log_format = "full"   # "full" = per-request .json with body (default), "headers" = daily .jsonl with headers only
 
-# OpenAI-compatible /v1/* and /litellm/v1/* endpoints. They are backed by the
-# litellm dependency, which costs ~200 MB of RSS and ~1.9s on first use.
-# Set to false when no client needs them; the routes then answer 410 Gone
-# without importing litellm. Plain proxying through a provider prefix is
-# unaffected.
-enable_v1 = true
+# The /v1/* and /litellm/v1/* chat and responses endpoints are not served:
+# they required the litellm dependency (~200 MB RSS). The OpenAI-compatible
+# model catalog (/v1/models) is still available without it. Use a provider
+# prefix to reach an upstream, e.g. /<prefix>/v1/chat/completions.
 
 # Client tool recognition is always on (no config needed): each request is
 # fingerprinted by User-Agent / headers into a client name (claude-code, codex,
@@ -71,12 +69,6 @@ prefix = "/grok"
 upstream = "https://api.x.ai"
 strip_prefix = true
 env_token = "TOKEN_GROK"
-
-[providers.litellm]
-prefix = "/litellm/v1"
-upstream = "https://open.bigmodel.cn/api/coding/paas/v4"
-strip_prefix = true
-env_token = "TOKEN_ZHIPUAI"
 
 [providers.deepseek]
 prefix = "/deepseek"

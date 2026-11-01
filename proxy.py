@@ -18,12 +18,12 @@ from src.admin import (
 from src.config import load_config
 from src.db import init_db
 from src.handlers import create_handlers
+from src.model_catalog import create_catalog_handlers
 from src.network import fetch_public_ip
 from src.pool import load_pool_from_db
 from src.quota import create_quota_handlers
 from src.throughput import ThroughputMonitor, create_throughput_handlers
 from src.usage_monitor import UsageMonitor
-from src.v1_handler import create_v1_handlers
 
 mimetypes.add_type("font/ttf", ".ttf")
 mimetypes.add_type("font/otf", ".otf")
@@ -139,21 +139,16 @@ async def main():
         api_delete_model,
     ) = create_site_model_handlers(cfg, db_conn)
 
-    (
-        v1_chat_completions,
-        v1_responses,
-        v1_list_models,
-        v1_get_model,
-    ) = create_v1_handlers(cfg, token_pool, db_conn, monitor, usage_monitor)
+    v1_list_models, v1_get_model = create_catalog_handlers(cfg, token_pool, db_conn)
 
-    if not cfg.enable_v1:
-
-        async def v1_disabled(_request: web.Request) -> web.Response:
-            return web.json_response(
-                {"error": "v1 routes are disabled (enable_v1 = false)"}, status=410
-            )
-
-        v1_chat_completions = v1_responses = v1_list_models = v1_get_model = v1_disabled
+    async def v1_completions_removed(_request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "error": "v1 chat/responses endpoints were removed; "
+                "use a provider prefix such as /gjzq/ds/v1/chat/completions"
+            },
+            status=410,
+        )
 
     app = web.Application(
         client_max_size=100 * 1024 * 1024,
@@ -200,10 +195,10 @@ async def main():
         return web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
     app.router.add_get("/", serve_index)
-    app.router.add_post("/v1/chat/completions", v1_chat_completions)
-    app.router.add_post("/v1/responses", v1_responses)
-    app.router.add_post("/litellm/v1/chat/completions", v1_chat_completions)
-    app.router.add_post("/litellm/v1/responses", v1_responses)
+    app.router.add_post("/v1/chat/completions", v1_completions_removed)
+    app.router.add_post("/v1/responses", v1_completions_removed)
+    app.router.add_post("/litellm/v1/chat/completions", v1_completions_removed)
+    app.router.add_post("/litellm/v1/responses", v1_completions_removed)
     app.router.add_route("*", "/{path:.*}", proxy_handler)
 
     runner = web.AppRunner(app)

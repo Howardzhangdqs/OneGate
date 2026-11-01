@@ -20,7 +20,7 @@ from src.db import (
 )
 from src.models import Provider
 from src.pool import load_pool_from_db
-from src.v1_handler import _resolve_v1_mapping, create_v1_handlers
+from src.model_catalog import create_catalog_handlers
 
 ALL_TOKEN = f"{'a' * 32}.AAAAAAAAAAAAAAAA"
 ADMIN_TOKEN = f"{'d' * 32}.DDDDDDDDDDDDDDDD"
@@ -155,12 +155,9 @@ class TestV1SiteModelPatterns(AioHTTPTestCase):
 
         self.token_pool = load_pool_from_db(self.db_conn)
 
-        (
-            _,
-            _,
-            v1_list_models,
-            v1_get_model,
-        ) = create_v1_handlers(self.cfg, self.token_pool, self.db_conn)
+        v1_list_models, v1_get_model = create_catalog_handlers(
+            self.cfg, self.token_pool, self.db_conn
+        )
 
         app = web.Application()
         app.router.add_get("/v1/models", v1_list_models)
@@ -173,36 +170,6 @@ class TestV1SiteModelPatterns(AioHTTPTestCase):
 
     def _auth(self) -> dict:
         return {"Authorization": f"Bearer {ALL_TOKEN}"}
-
-    async def test_pattern_mapping_resolves_provider_and_target(self):
-        mapped, provider, original, token_matched = _resolve_v1_mapping(
-            self.db_conn, self.cfg, ALL_TOKEN, "claude-3-5-sonnet"
-        )
-        assert mapped == "upstream-3-5-sonnet"
-        assert provider.name == "oai"
-        assert original == "claude-3-5-sonnet"
-        assert token_matched is False
-
-    async def test_fnmatch_mapping_resolves(self):
-        mapped, provider, original, _ = _resolve_v1_mapping(
-            self.db_conn, self.cfg, ALL_TOKEN, "claude-3-5-sonnet"
-        )
-        assert mapped == "upstream-3-5-sonnet"
-        assert provider.name == "oai"
-
-        mapped, provider, _, _ = _resolve_v1_mapping(
-            self.db_conn, self.cfg, ALL_TOKEN, "glm-4.5"
-        )
-        assert mapped == "glm-4.5"
-        assert provider.name == "glm"
-
-    async def test_exact_mapping_still_resolves(self):
-        mapped, provider, original, _ = _resolve_v1_mapping(
-            self.db_conn, self.cfg, ALL_TOKEN, "glm-model"
-        )
-        assert mapped == "upstream-glm"
-        assert provider.name == "glm"
-        assert original == "glm-model"
 
     async def test_list_models_excludes_pattern_rules(self):
         resp = await self.client.get("/v1/models", headers=self._auth())

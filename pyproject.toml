@@ -7,7 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.13.3",
     "brotli>=1.2.0",
-    "litellm>=1.83.14",
     "proxy-py>=2.4.10",
     "python-dotenv>=1.2.2",
     "toml>=0.10.2",
