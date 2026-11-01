@@ -2,15 +2,15 @@
   'use strict';
 
   var NAV_ITEMS = [
-    { key: 'home', label: 'Home', href: '/' },
-    { key: 'status', label: 'Status', href: '/status' },
-    { key: 'usage', label: 'Usage', href: '/usage' },
-    { key: 'clients', label: 'Clients', href: '/clients' },
-    { key: 'mapping', label: 'Mapping', href: '/mapping' },
-    { key: 'models', label: 'Models', href: '/models' },
-    { key: 'pricing', label: 'Pricing', href: '/pricing' },
-    { key: 'throughput', label: 'Throughput', href: '/throughput' },
-    { key: 'admin', label: 'Admin', href: '/admin' }
+    { key: 'home', label: '首页', href: '/' },
+    { key: 'status', label: '状态', href: '/status' },
+    { key: 'usage', label: '用量', href: '/usage' },
+    { key: 'clients', label: '客户端', href: '/clients' },
+    { key: 'mapping', label: '映射', href: '/mapping' },
+    { key: 'models', label: '模型', href: '/models' },
+    { key: 'pricing', label: '定价', href: '/pricing' },
+    { key: 'throughput', label: '吞吐', href: '/throughput' },
+    { key: 'admin', label: '管理', href: '/admin' }
   ];
 
   function resolveTarget(target) {
@@ -51,7 +51,7 @@
   function buildNav(active) {
     var nav = document.createElement('nav');
     nav.className = 'og-nav';
-    nav.setAttribute('aria-label', 'Primary');
+    nav.setAttribute('aria-label', '主导航');
     for (var i = 0; i < NAV_ITEMS.length; i++) {
       var item = NAV_ITEMS[i];
       var link = document.createElement('a');

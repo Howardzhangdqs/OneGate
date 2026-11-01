@@ -1,7 +1,7 @@
 [project]
 name = "onegate"
 version = "0.1.0"
-description = "Add your description here"
+description = "OneGate —— 多提供商 AI 反向代理"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

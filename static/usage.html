@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usage Query</title>
+  <title>用量查询</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .container {
       max-width: 960px
@@ -613,54 +613,54 @@
   <script>
     OneGateHeader.mount('#og-header', {
       active: 'usage',
-      title: 'Usage Query'
+      title: '用量查询'
     });
   </script>
   <div class="container">
     <div class="card">
-      <h3>Query Parameters</h3>
+      <h3>查询参数</h3>
       <div class="form-row">
         <div class="form-group" style="flex:2">
           <label>Token</label>
-          <input type="text" id="input-token" placeholder="enter your proxy token... (empty = site-wide)">
+          <input type="text" id="input-token" placeholder="输入你的 proxy token…（留空 = 全站）">
           <div class="recent-tokens" id="recent-tokens"></div>
         </div>
         <div class="form-group">
-          <label>Start (optional)</label>
+          <label>开始时间（可选）</label>
           <input type="datetime-local" id="input-start">
         </div>
         <div class="form-group">
-          <label>End (optional)</label>
+          <label>结束时间（可选）</label>
           <input type="datetime-local" id="input-end">
         </div>
-        <button class="btn btn-primary" onclick="queryUsage()">Query</button>
+        <button class="btn btn-primary" onclick="queryUsage()">查询</button>
       </div>
       <div id="error" class="error-msg" style="display:none"></div>
       <div class="live-row">
         <div class="live-toggle" id="live-toggle" onclick="toggleLive()">
           <span class="live-switch"></span>
-          <span>Live</span>
+          <span>实时</span>
         </div>
         <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8b949e">
           <span class="live-dot" id="live-dot"></span>
-          <span id="live-status">Live off</span>
+          <span id="live-status">实时已关闭</span>
         </span>
       </div>
     </div>
 
     <div id="results">
       <div class="card">
-        <h3>Token Info</h3>
+        <h3>Token 信息</h3>
         <div class="token-info">
-          Token: <code id="res-token"></code> <span id="res-describe" style="font-size:12px;color:#8b949e"></span>
-          <br>Providers: <span class="providers-tag" id="res-providers"></span>
+          Token： <code id="res-token"></code> <span id="res-describe" style="font-size:12px;color:#8b949e"></span>
+          <br>提供商： <span class="providers-tag" id="res-providers"></span>
         </div>
         <div class="summary-grid" id="summary-grid"></div>
       </div>
 
       <div class="card" id="quota-card" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Coding Plan Quota <span class="tag" id="quota-plan" style="display:none"></span></h3>
+          <h3 style="margin:0">Coding Plan 配额 <span class="tag" id="quota-plan" style="display:none"></span></h3>
           <span style="font-size:12px;color:#8b949e">上游 GLM Coding Plan · 缓存 60s</span>
         </div>
         <div class="limits-grid" id="quota-grid"></div>
@@ -668,7 +668,7 @@
 
       <div class="card" id="limits-card" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Rate Limits</h3>
+          <h3 style="margin:0">速率限制</h3>
           <span style="font-size:12px;color:#8b949e" id="limits-sub"></span>
         </div>
         <div class="limits-grid" id="limits-grid"></div>
@@ -676,42 +676,42 @@
 
       <div class="card" id="trend-card">
         <div class="trend-head">
-          <h3 style="margin:0">Daily Usage Trend</h3>
-          <div class="trend-ranges" role="group" aria-label="Trend range">
+          <h3 style="margin:0">每日用量趋势</h3>
+          <div class="trend-ranges" role="group" aria-label="趋势范围">
             <button type="button" class="trend-range" data-range="30" aria-pressed="false" onclick="trendSetRange(30)">30D</button>
             <button type="button" class="trend-range" data-range="90" aria-pressed="true" onclick="trendSetRange(90)">90D</button>
-            <button type="button" class="trend-range" data-range="3650" aria-pressed="false" onclick="trendSetRange(3650)">All</button>
+            <button type="button" class="trend-range" data-range="3650" aria-pressed="false" onclick="trendSetRange(3650)">全部</button>
           </div>
         </div>
         <div class="trend-sub" id="trend-sub"></div>
         <div class="trend-legend">
-          <span class="lg"><span class="lg-sw" style="background:#3fb950"></span>Successes</span>
-          <span class="lg"><span class="lg-sw" style="background:#f85149"></span>Failed</span>
-          <span class="lg"><span class="lg-sw" style="background:#d29922"></span>Input tokens</span>
-          <span class="lg"><span class="lg-sw" style="background:#58a6ff"></span>Output tokens</span>
-          <span class="lg"><span class="lg-sw lg-hatch"></span>No data</span>
+          <span class="lg"><span class="lg-sw" style="background:#3fb950"></span>成功</span>
+          <span class="lg"><span class="lg-sw" style="background:#f85149"></span>失败</span>
+          <span class="lg"><span class="lg-sw" style="background:#d29922"></span>输入 token</span>
+          <span class="lg"><span class="lg-sw" style="background:#58a6ff"></span>输出 token</span>
+          <span class="lg"><span class="lg-sw lg-hatch"></span>无数据</span>
         </div>
         <div class="trend-chart" id="trend-chart" style="display:none"></div>
-        <div class="empty" id="trend-empty">Enter a token above to see the daily trend.</div>
+        <div class="empty" id="trend-empty">在上方输入 token 以查看每日趋势。</div>
         <div class="trend-totals" id="trend-totals"></div>
       </div>
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Token Usage by Provider</h3>
-          <span style="font-size:12px;color:#8b949e">In selected range</span>
+          <h3 style="margin:0">按提供商的 Token 用量</h3>
+          <span style="font-size:12px;color:#8b949e">所选范围内</span>
         </div>
-        <div id="tokens-empty" class="loading">No token usage in selected range</div>
+        <div id="tokens-empty" class="loading">所选范围内无 Token 用量</div>
         <div class="table-wrap">
           <table id="tokens-table" style="display:none">
             <thead>
               <tr>
-                <th>Provider</th>
-                <th>Req</th>
-                <th><span class="dot seg-in"></span>In</th>
-                <th><span class="dot seg-out"></span>Out</th>
-                <th><span class="dot seg-cr"></span>Cache R</th>
-                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>提供商</th>
+                <th>请求数</th>
+                <th><span class="dot seg-in"></span>输入</th>
+                <th><span class="dot seg-out"></span>输出</th>
+                <th><span class="dot seg-cr"></span>缓存读</th>
+                <th><span class="dot seg-cw"></span>缓存写</th>
                 <th>命中率</th>
                 <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
               </tr>
@@ -723,20 +723,20 @@
 
       <div class="card" id="models-card" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Cost by Model</h3>
-          <span style="font-size:12px;color:#8b949e" id="models-sub">Estimated · 元</span>
+          <h3 style="margin:0">按模型的成本</h3>
+          <span style="font-size:12px;color:#8b949e" id="models-sub">预估 · 元</span>
         </div>
         <div class="table-wrap">
           <table id="models-table">
             <thead>
               <tr>
-                <th>Model</th>
-                <th>Req</th>
-                <th><span class="dot seg-in"></span>In</th>
-                <th><span class="dot seg-out"></span>Out</th>
-                <th><span class="dot seg-cr"></span>Cache R</th>
-                <th><span class="dot seg-cw"></span>Cache W</th>
-                <th>Cost (元)</th>
+                <th>模型</th>
+                <th>请求数</th>
+                <th><span class="dot seg-in"></span>输入</th>
+                <th><span class="dot seg-out"></span>输出</th>
+                <th><span class="dot seg-cr"></span>缓存读</th>
+                <th><span class="dot seg-cw"></span>缓存写</th>
+                <th>成本（元）</th>
                 <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
               </tr>
             </thead>
@@ -747,20 +747,20 @@
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Token Usage by Client</h3>
-          <span style="font-size:12px;color:#8b949e">Requests, token usage & cache hit rate per client tool</span>
+          <h3 style="margin:0">按客户端的 Token 用量</h3>
+          <span style="font-size:12px;color:#8b949e">每个客户端工具的请求数、token 用量与缓存命中率</span>
         </div>
-        <div id="clients-empty" class="loading">No client data in selected range</div>
+        <div id="clients-empty" class="loading">所选范围内无客户端数据</div>
         <div class="table-wrap">
           <table id="clients-table" style="display:none">
             <thead>
               <tr>
-                <th>Client</th>
-                <th>Req</th>
-                <th><span class="dot seg-in"></span>In</th>
-                <th><span class="dot seg-out"></span>Out</th>
-                <th><span class="dot seg-cr"></span>Cache R</th>
-                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>客户端</th>
+                <th>请求数</th>
+                <th><span class="dot seg-in"></span>输入</th>
+                <th><span class="dot seg-out"></span>输出</th>
+                <th><span class="dot seg-cr"></span>缓存读</th>
+                <th><span class="dot seg-cw"></span>缓存写</th>
                 <th>命中率</th>
                 <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
               </tr>
@@ -773,24 +773,24 @@
       <div class="card" id="hourly-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:8px">
-            <h3 style="margin:0">Hourly Token Usage</h3>
-            <span style="font-size:11px;color:#8b949e">(in + out + cache)</span>
+            <h3 style="margin:0">每小时 Token 用量</h3>
+            <span style="font-size:11px;color:#8b949e">（输入 + 输出 + 缓存）</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#8b949e;cursor:pointer;user-select:none" onclick="document.getElementById('chk-local').click()">
-            <input type="checkbox" id="chk-local" onchange="toggleTimezone()" style="accent-color:#58a6ff">Local Timezone
-            (<span id="tz-name"></span>)
+            <input type="checkbox" id="chk-local" onchange="toggleTimezone()" style="accent-color:#58a6ff">本地时区
+            <span>（<span id="tz-name"></span>）</span>
           </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Hour</th>
-                <th>Req</th>
-                <th><span class="dot seg-in"></span>In</th>
-                <th><span class="dot seg-out"></span>Out</th>
-                <th><span class="dot seg-cr"></span>Cache R</th>
-                <th><span class="dot seg-cw"></span>Cache W</th>
+                <th>小时</th>
+                <th>请求数</th>
+                <th><span class="dot seg-in"></span>输入</th>
+                <th><span class="dot seg-out"></span>输出</th>
+                <th><span class="dot seg-cr"></span>缓存读</th>
+                <th><span class="dot seg-cw"></span>缓存写</th>
                 <th>命中率</th>
                 <th style="min-width:120px;text-align:left"><span class="dot seg-in"></span><span class="dot seg-out"></span><span class="dot seg-cr"></span><span class="dot seg-cw"></span>组成</th>
               </tr>
@@ -798,11 +798,11 @@
             <tbody id="hourly-body"></tbody>
           </table>
         </div>
-        <div id="hourly-empty" class="loading" style="display:none">No data in selected range</div>
+        <div id="hourly-empty" class="loading" style="display:none">所选范围内无数据</div>
       </div>
     </div>
 
-    <div id="loading" class="loading" style="display:none">Loading...</div>
+    <div id="loading" class="loading" style="display:none">加载中…</div>
   </div>
 
   <script>
@@ -818,7 +818,7 @@
 
     inputToken.addEventListener('keydown', e => { if (e.key === 'Enter') queryUsage(); });
 
-    // Auto-fill token from localStorage (set by admin page)
+    // 从 localStorage 自动填充 token（由管理员页面设置）
     (function initFromStorage() {
       const raw = localStorage.getItem('_usage_token');
       if (raw) {
@@ -884,7 +884,7 @@
         const data = await resp.json();
         document.getElementById('loading').style.display = 'none';
         if (!resp.ok) {
-          showError(data.error || 'Request failed');
+          showError(data.error || '请求失败');
           return;
         }
         renderResults(data);
@@ -897,7 +897,7 @@
         }
       } catch (e) {
         document.getElementById('loading').style.display = 'none';
-        showError('Network error: ' + e.message);
+        showError('网络错误：' + e.message);
       }
     }
 
@@ -947,8 +947,8 @@
     }
 
     function fmtReset(s) {
-      if (s == null) return 'never';
-      if (s <= 0) return 'now';
+      if (s == null) return '从未';
+      if (s <= 0) return '现在';
       if (s < 60) return s + 's';
       if (s < 3600) return Math.round(s / 60) + 'm';
       if (s < 86400) return Math.round(s / 3600) + 'h';
@@ -961,14 +961,14 @@
       const sub = document.getElementById('limits-sub');
       if (!limits || !limits.length) { card.style.display = 'none'; return; }
       card.style.display = '';
-      sub.textContent = 'updated ' + new Date().toLocaleTimeString();
+      sub.textContent = '更新于 ' + new Date().toLocaleTimeString();
       grid.innerHTML = limits.map(l => {
         const pct = Math.max(0, Math.min(100, l.percent));
         const over = l.percent > 100;
         const barColor = over ? '#f85149' : (l.percent > 80 ? '#d29922' : '#58a6ff');
         return '<div class="limit-item">' +
           '<div class="limit-head"><span class="limit-label">' + esc(l.label) + '</span>' +
-          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + esc(l.unit) + ' (' + l.percent + '%) · reset ' + fmtReset(l.reset_in) + '</span></div>' +
+          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + esc(l.unit) + ' (' + l.percent + '%) · 重置 ' + fmtReset(l.reset_in) + '</span></div>' +
           '<div class="limit-bar"><div class="limit-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
           '</div>';
       }).join('');
@@ -1034,7 +1034,7 @@
           const d = new Date(l.nextResetTime);
           const abs = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
           resetHtml = '<div class="quota-reset">重置 <b class="quota-cd" data-reset="' + l.nextResetTime + '">' +
-            quotaCountdown(l.nextResetTime - Date.now()) + '</b> 后 · ' + abs + '</div>';
+            quotaCountdown(l.nextResetTime - Date.now()) + '</b> · ' + abs + '</div>';
         }
         return '<div class="limit-item">' +
           '<div class="limit-head"><span class="limit-label">' + esc(quotaLabel(l)) + '</span>' +
@@ -1076,19 +1076,19 @@
 
       const provsEl = document.getElementById('res-providers');
       if (data.providers.includes('*')) {
-        provsEl.innerHTML = '<span class="tag tag-all">* (all)</span>';
+        provsEl.innerHTML = '<span class="tag tag-all">*（全部）</span>';
       } else {
         provsEl.innerHTML = data.providers.map(p => `<span class="tag">${esc(p)}</span>`).join('');
       }
 
       const summaryItems = [
-        { label: 'Range Total', value: data.total, cls: '' },
-        { label: 'Last 24h', value: data.summary.last_24h, cls: 'current' },
-        { label: 'Last 7d', value: data.summary.last_7d, cls: '' },
-        { label: 'Last 30d', value: data.summary.last_30d, cls: '' },
+        { label: '范围内总计', value: data.total, cls: '' },
+        { label: '最近 24h', value: data.summary.last_24h, cls: 'current' },
+        { label: '最近 7d', value: data.summary.last_7d, cls: '' },
+        { label: '最近 30d', value: data.summary.last_30d, cls: '' },
       ];
       if (data.total_cost != null) {
-        summaryItems.push({ label: 'Est. Cost (元)', value: fmtCost(data.total_cost), cls: 'cost' });
+        summaryItems.push({ label: '预估成本（元）', value: fmtCost(data.total_cost), cls: 'cost' });
       }
       const summaryHtml = summaryItems.map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
       document.getElementById('summary-grid').innerHTML = summaryHtml;
@@ -1137,13 +1137,13 @@
         disconnectLive();
       } else {
         if (!_usageData) {
-          setLiveStatus('error', 'Query a token first');
-          setTimeout(() => { if (!_liveOn) setLiveStatus('', 'Live off'); }, 1800);
+          setLiveStatus('error', '请先查询一个 token');
+          setTimeout(() => { if (!_liveOn) setLiveStatus('', '实时已关闭'); }, 1800);
           return;
         }
         if (!inputToken.value.trim()) {
-          setLiveStatus('error', 'Live needs a specific token');
-          setTimeout(() => { if (!_liveOn) setLiveStatus('', 'Live off'); }, 1800);
+          setLiveStatus('error', '实时模式需要指定 token');
+          setTimeout(() => { if (!_liveOn) setLiveStatus('', '实时已关闭'); }, 1800);
           return;
         }
         connectLive();
@@ -1153,7 +1153,7 @@
     async function connectLive() {
       disconnectLive(true);
       const token = inputToken.value.trim();
-      if (!token) { setLiveStatus('error', 'No token'); return; }
+      if (!token) { setLiveStatus('error', '无 token'); return; }
       const body = { token };
       if (inputStart.value) body.start = new Date(inputStart.value).toISOString();
       if (inputEnd.value) body.end = new Date(inputEnd.value).toISOString();
@@ -1161,7 +1161,7 @@
       _liveStart = body.start || null;
       _liveEnd = body.end || null;
       setLiveToggle(true);
-      setLiveStatus('connecting', 'Connecting...');
+      setLiveStatus('connecting', '连接中…');
       try {
         const resp = await fetch('/usage/api/stream', {
           method: 'POST',
@@ -1171,14 +1171,14 @@
         const data = await resp.json();
         if (!resp.ok) {
           setLiveToggle(false);
-          setLiveStatus('error', data.error || 'Failed');
+          setLiveStatus('error', data.error || '失败');
           return;
         }
         _liveSid = data.session_id;
         openLiveEventSource();
       } catch (e) {
         setLiveToggle(false);
-        setLiveStatus('error', 'Network error');
+        setLiveStatus('error', '网络错误');
       }
     }
 
@@ -1190,7 +1190,7 @@
           const data = JSON.parse(e.data);
           _usageData = data;
           renderResults(data);
-          setLiveStatus('live', 'Live');
+          setLiveStatus('live', '实时');
         } catch (err) { }
       });
 
@@ -1198,13 +1198,13 @@
         try {
           if (e.data) {
             const obj = JSON.parse(e.data);
-            setLiveStatus('error', obj.error || 'Snapshot error');
+            setLiveStatus('error', obj.error || '快照错误');
           }
         } catch (err) { }
       });
 
       _liveEventSource.addEventListener('connected', () => {
-        setLiveStatus('live', 'Live');
+        setLiveStatus('live', '实时');
       });
 
       _liveEventSource.addEventListener('delta', e => {
@@ -1217,7 +1217,7 @@
       _liveEventSource.onerror = () => {
         if (!_liveOn) return;
         if (_liveEventSource) { _liveEventSource.close(); _liveEventSource = null; }
-        setLiveStatus('connecting', 'Reconnecting...');
+        setLiveStatus('connecting', '正在重连…');
         setTimeout(() => { if (_liveOn) connectLive(); }, 1500);
       };
     }
@@ -1229,7 +1229,7 @@
       }
       _liveSid = null;
       setLiveToggle(false);
-      if (!silent) setLiveStatus('', 'Live off');
+      if (!silent) setLiveStatus('', '实时已关闭');
     }
 
     function applyDelta(d) {
@@ -1291,10 +1291,10 @@
     function rerenderAll() {
       if (!_usageData) return;
       const summaryItems = [
-        { label: 'Range Total', value: _usageData.total, cls: '' },
-        { label: 'Last 24h', value: _usageData.summary.last_24h, cls: 'current' },
-        { label: 'Last 7d', value: _usageData.summary.last_7d, cls: '' },
-        { label: 'Last 30d', value: _usageData.summary.last_30d, cls: '' },
+        { label: '范围内总计', value: _usageData.total, cls: '' },
+        { label: '最近 24h', value: _usageData.summary.last_24h, cls: 'current' },
+        { label: '最近 7d', value: _usageData.summary.last_7d, cls: '' },
+        { label: '最近 30d', value: _usageData.summary.last_30d, cls: '' },
       ];
       if (_pricingMap && _usageData.models) {
         let tc = 0, has = false;
@@ -1302,7 +1302,7 @@
           const p = _pricingMap[m];
           if (p) { tc += computeCost(_usageData.models[m], p); has = true; }
         }
-        if (has) summaryItems.push({ label: 'Est. Cost (元)', value: fmtCost(tc), cls: 'cost' });
+        if (has) summaryItems.push({ label: '预估成本（元）', value: fmtCost(tc), cls: 'cost' });
       }
       const summaryHtml = summaryItems.map(s => `<div class="summary-item ${s.cls}"><div class="value">${s.value}</div><div class="label">${s.label}</div></div>`).join('');
       document.getElementById('summary-grid').innerHTML = summaryHtml;
@@ -1342,7 +1342,7 @@
       'kilo': 'Kilo', 'kilo-code': 'Kilo Code', 'qwen-code': 'Qwen Code',
       'crush': 'Crush', 'goose': 'Goose', 'serena': 'Serena',
       'python-openai': 'OpenAI SDK (Python)', 'node-openai': 'OpenAI SDK (Node)',
-      'unknown': 'Unknown'
+      'unknown': '未知'
     };
     function clientLabel(n) { return _clientLabels[n] || n; }
 
@@ -1407,15 +1407,15 @@
         if (cost != null) { totCost += cost; hasCost = true; }
         const dd = { input: d.input || 0, output: d.output || 0, cache_read: d.cache_read || 0, cache_write: d.cache_write || 0 };
         const stackW = Math.max(2, tokSum(dd) / maxVal * 100).toFixed(1);
-        const nameDisp = name === '' ? '<span style="color:#8b949e">(unknown)</span>' : esc(name);
+        const nameDisp = name === '' ? '<span style="color:#8b949e">（未知）</span>' : esc(name);
         const costCls = price ? 'num-cr' : '';
         return `<tr><td class="pt-prov">${nameDisp}</td>${cell(d.requests || 0)}${cell(d.input, 'num-in')}${cell(d.output, 'num-out')}${cell(d.cache_read, 'num-cr')}${cell(d.cache_write, 'num-cw')}<td class="${costCls}">${fmtCost(cost)}</td><td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(dd)}</div></td></tr>`;
       });
-      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}<td class="num-cr">${hasCost ? fmtCost(totCost) : '-'}</td><td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      rows.push(`<tr class="h-total"><td>总计</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}<td class="num-cr">${hasCost ? fmtCost(totCost) : '-'}</td><td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
       tbody.innerHTML = rows.join('');
       sub.textContent = hasCost
-        ? `Estimated · total ${fmtCost(totCost)} 元`
-        : 'Estimated · 元';
+        ? `预估 · 总计 ${fmtCost(totCost)} 元`
+        : '预估 · 元';
     }
 
     function renderClients(clientsDetail) {
@@ -1430,7 +1430,7 @@
       if (!hasData) {
         tableEl.style.display = 'none';
         emptyEl.style.display = '';
-        emptyEl.textContent = 'No client data in selected range';
+        emptyEl.textContent = '所选范围内无客户端数据';
         return;
       }
       emptyEl.style.display = 'none';
@@ -1448,7 +1448,7 @@
         const isUnknown = name === 'unknown';
         return `<tr><td class="pt-prov" ${isUnknown ? 'style="color:#d29922"' : ''}>${esc(clientLabel(name))}</td>${cell(t.requests || 0)}${cell(t.input, 'num-in')}${cell(t.output, 'num-out')}${cell(t.cache_read, 'num-cr')}${cell(t.cache_write, 'num-cw')}${hitRateCell(t.cache_read, t.input)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(d)}</div></td></tr>`;
       });
-      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      rows.push(`<tr class="h-total"><td>总计</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
       tbody.innerHTML = rows.join('');
     }
 
@@ -1485,7 +1485,7 @@
         const stackW = Math.max(2, tokSum(d) / maxVal * 100).toFixed(1);
         return `<tr><td class="pt-prov">${esc(p)}</td>${cell(t.requests || 0)}${cell(t.input, 'num-in')}${cell(t.output, 'num-out')}${cell(t.cache_read, 'num-cr')}${cell(t.cache_write, 'num-cw')}${hitRateCell(t.cache_read, t.input)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs(d)}</div></td></tr>`;
       });
-      rows.push(`<tr class="h-total"><td>Total</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
+      rows.push(`<tr class="h-total"><td>总计</td>${cell(totReq)}${cell(totIn, 'num-in')}${cell(totOut, 'num-out')}${cell(totCR, 'num-cr')}${cell(totCW, 'num-cw')}${hitRateCell(totCR, totIn)}<td style="text-align:left"><div class="stack" style="width:100%">${stackSegs({ input: totIn, output: totOut, cache_read: totCR, cache_write: totCW })}</div></td></tr>`);
       tbody.innerHTML = rows.join('');
     }
 
@@ -1550,10 +1550,10 @@
         const clients = r.clientDetails.filter(cd => tokSum(cd.d) > 0 || (cd.d.requests || 0) > 0);
         let tip = '';
         if (provs.length > 0) {
-          tip += '<div class="tip-section">By Provider</div>' + provTipHtml(provs);
+          tip += '<div class="tip-section">按提供商</div>' + provTipHtml(provs);
         }
         if (clients.length > 0) {
-          tip += '<div class="tip-section">By Client</div>' + clientTipHtml(clients);
+          tip += '<div class="tip-section">按客户端</div>' + clientTipHtml(clients);
         }
         const stackW = Math.max(2, (r.dIn + r.dOut + r.dCR + r.dCW) / maxVal * 100).toFixed(1);
         html.push(`<tr class="h-row" data-provs="${escAttr(tip)}"><td class="h-hour">${fmtHour(r.hour)}</td>${cell(r.dReq)}${cell(r.dIn, 'num-in')}${cell(r.dOut, 'num-out')}${cell(r.dCR, 'num-cr')}${cell(r.dCW, 'num-cw')}${hitRateCell(r.dCR, r.dIn)}<td style="text-align:left"><div class="stack" style="width:${stackW}%">${stackSegs({ input: r.dIn, output: r.dOut, cache_read: r.dCR, cache_write: r.dCW })}</div></td></tr>`);
@@ -1562,7 +1562,7 @@
     }
 
     function clientTipHtml(clients) {
-      const head = '<thead><tr><th>Client</th><th>Req</th><th>In</th><th>Out</th><th>Cache R</th><th>Cache W</th><th>命中率</th></tr></thead>';
+      const head = '<thead><tr><th>客户端</th><th>请求数</th><th>输入</th><th>输出</th><th>缓存读</th><th>缓存写</th><th>命中率</th></tr></thead>';
       let tIn = 0, tOut = 0, tCR = 0, tCW = 0, tReq = 0;
       const rows = clients.map(({ c, d }) => {
         tIn += d.input || 0; tOut += d.output || 0;
@@ -1572,7 +1572,7 @@
         const cc = (v, cls) => `<td class="${cls}">${fmtNum(v)}</td>`;
         return `<tr><td class="pt-prov" ${isUnknown ? 'style="color:#d29922"' : ''}>${esc(clientLabel(c))}</td>${cc(d.requests || 0)}${cc(d.input || 0, 'pt-in')}${cc(d.output || 0, 'pt-out')}${cc(d.cache_read || 0, 'pt-cr')}${cc(d.cache_write || 0, 'pt-cw')}${ptHitRateCell(d.cache_read, d.input)}</tr>`;
       });
-      rows.push(`<tr class="pt-total"><td>Total</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
+      rows.push(`<tr class="pt-total"><td>总计</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
       return '<table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
     }
 
@@ -1585,7 +1585,7 @@
     }
 
     function provTipHtml(provs) {
-      const head = '<thead><tr><th>Provider</th><th>Req</th><th>In</th><th>Out</th><th>Cache R</th><th>Cache W</th><th>命中率</th></tr></thead>';
+      const head = '<thead><tr><th>提供商</th><th>请求数</th><th>输入</th><th>输出</th><th>缓存读</th><th>缓存写</th><th>命中率</th></tr></thead>';
       let tIn = 0, tOut = 0, tCR = 0, tCW = 0, tReq = 0;
       const rows = provs.map(({ p, d }) => {
         tIn += d.input || 0; tOut += d.output || 0;
@@ -1594,7 +1594,7 @@
         const c = (v, cls) => `<td class="${cls}">${fmtNum(v)}</td>`;
         return `<tr><td class="pt-prov">${esc(p)}</td>${c(d.requests || 0)}${c(d.input || 0, 'pt-in')}${c(d.output || 0, 'pt-out')}${c(d.cache_read || 0, 'pt-cr')}${c(d.cache_write || 0, 'pt-cw')}${ptHitRateCell(d.cache_read, d.input)}</tr>`;
       });
-      rows.push(`<tr class="pt-total"><td>Total</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
+      rows.push(`<tr class="pt-total"><td>总计</td><td>${fmtNum(tReq)}</td><td class="pt-in">${fmtNum(tIn)}</td><td class="pt-out">${fmtNum(tOut)}</td><td class="pt-cr">${fmtNum(tCR)}</td><td class="pt-cw">${fmtNum(tCW)}</td>${ptHitRateCell(tCR, tIn)}</tr>`);
       return '<table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
     }
 
@@ -1710,23 +1710,23 @@
     }
 
     function trendErrText(status, body) {
-      if (status === 401) return 'No token sent — enter your proxy token above.';
-      if (status === 403) return 'Invalid or disabled token.';
-      if (status === 400) return 'Invalid range requested.';
-      return (body && body.error) || ('Failed to load the trend (HTTP ' + status + ').');
+      if (status === 401) return '未发送 token — 请在上方输入你的 proxy token。';
+      if (status === 403) return 'token 无效或已禁用。';
+      if (status === 400) return '请求的时间范围无效。';
+      return (body && body.error) || ('加载趋势失败（HTTP ' + status + '）。');
     }
 
     async function trendLoad() {
       const token = inputToken.value.trim();
       const seq = ++_trendSeq;
-      if (!token) { trendEmpty('Enter a token above to see the daily trend.'); return; }
+      if (!token) { trendEmpty('在上方输入 token 以查看每日趋势。'); return; }
 
       const emptyEl = document.getElementById('trend-empty');
       document.getElementById('trend-chart').style.display = 'none';
       document.getElementById('trend-totals').innerHTML = '';
       document.getElementById('trend-sub').textContent = '';
       emptyEl.className = 'empty';
-      emptyEl.textContent = 'Loading trend...';
+      emptyEl.textContent = '正在加载趋势…';
       emptyEl.style.display = '';
 
       try {
@@ -1742,7 +1742,7 @@
         trendRender();
       } catch (e) {
         if (seq !== _trendSeq) return;
-        trendEmpty('Network error: ' + e.message);
+        trendEmpty('网络错误：' + e.message);
       }
     }
 
@@ -1832,7 +1832,7 @@
     function trendRender() {
       const m = _trendState;
       if (!m) return;
-      if (!m.hasData) { trendEmpty('No usage recorded in the selected range.'); return; }
+      if (!m.hasData) { trendEmpty('所选范围内没有用量记录。'); return; }
 
       const wrap = document.getElementById('trend-chart');
       document.getElementById('trend-empty').style.display = 'none';
@@ -1913,8 +1913,8 @@
       if (inPath) out.push('<path d="' + inPath + '" fill="#d29922"/>');
       if (outPath) out.push('<path d="' + outPath + '" fill="#58a6ff"/>');
 
-      out.push('<text x="' + x0 + '" y="' + (p1y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">REQUESTS</text>');
-      out.push('<text x="' + x0 + '" y="' + (p2y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">TOKENS · IN + OUT</text>');
+      out.push('<text x="' + x0 + '" y="' + (p1y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">请求数</text>');
+      out.push('<text x="' + x0 + '" y="' + (p2y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">TOKEN · 输入 + 输出</text>');
 
       const ticks = Math.max(2, Math.min(8, Math.floor(plotW / 78)));
       const used = new Set();
@@ -1936,11 +1936,11 @@
         '" fill="rgba(88,166,255,.10)" visibility="hidden" pointer-events="none"/>');
 
       const t = m.totals;
-      const aria = 'Daily usage trend chart, ' + m.startDate + ' to ' + m.endDate + '. ' +
-        t.daysWithData + ' of ' + m.n + ' days have data' +
-        (m.gapDays > 0 ? ', ' + m.gapDays + ' days have no recorded data' : '') + '. ' +
-        'Total ' + trendFmtFull(t.requests) + ' requests and ' + trendFmtFull(t.tokens) + ' tokens. ' +
-        'Top panel shows requests (successes and failed), bottom panel shows input and output tokens.';
+      const aria = '每日用量趋势图，' + m.startDate + ' 至 ' + m.endDate + '。' +
+        t.daysWithData + ' / ' + m.n + ' 天有数据' +
+        (m.gapDays > 0 ? '，' + m.gapDays + ' 天无记录数据' : '') + '。' +
+        '总计 ' + trendFmtFull(t.requests) + ' 次请求、' + trendFmtFull(t.tokens) + ' 个 token。' +
+        '上方图表显示请求数（成功与失败），下方图表显示输入与输出 token。';
 
       wrap.innerHTML = '<svg id="trend-svg" role="img" aria-label="' + escAttr(aria) + '" viewBox="0 0 ' +
         W + ' ' + H + '" width="' + W + '" height="' + H + '">' + out.join('') + '</svg>';
@@ -1950,37 +1950,37 @@
       _trendState = m;
 
       document.getElementById('trend-sub').textContent =
-        m.startDate + ' → ' + m.endDate + ' · ' + m.n + ' days · ' + t.daysWithData + ' with data' +
-        (m.gapRuns > 0 ? ' · ' + m.gapRuns + ' gap' + (m.gapRuns > 1 ? 's' : '') : '');
+        m.startDate + ' → ' + m.endDate + ' · ' + m.n + ' 天 · ' + t.daysWithData + ' 天有数据' +
+        (m.gapRuns > 0 ? ' · ' + m.gapRuns + ' 段空白' : '');
 
       const stat = (v, l, color) => '<div class="trend-stat"><div class="v"' +
         (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div><div class="l">' + l + '</div></div>';
       let statsHtml =
-        stat(trendFmtFull(t.requests), 'Requests in range') +
-        stat(t.requests > 0 ? (t.successes / t.requests * 100).toFixed(1) + '%' : '–', 'Success rate', '#3fb950') +
-        stat(trendFmtFull(t.tokens), 'Tokens in + out', '#58a6ff') +
-        stat(t.daysWithData + ' / ' + m.n, 'Days with data');
-      if (m.gapDays > 0) statsHtml += stat(String(m.gapDays), 'Days with no data', '#d29922');
+        stat(trendFmtFull(t.requests), '范围内请求数') +
+        stat(t.requests > 0 ? (t.successes / t.requests * 100).toFixed(1) + '%' : '–', '成功率', '#3fb950') +
+        stat(trendFmtFull(t.tokens), 'Token 输入 + 输出', '#58a6ff') +
+        stat(t.daysWithData + ' / ' + m.n, '有数据天数');
+      if (m.gapDays > 0) statsHtml += stat(String(m.gapDays), '无数据天数', '#d29922');
       document.getElementById('trend-totals').innerHTML = statsHtml;
     }
 
     function trendTipHtml(col) {
       if (!col.row) {
         return '<div class="tt-date">' + esc(col.date) + '</div>' +
-          '<div class="tt-gap">No data recorded for this day</div>';
+          '<div class="tt-gap">当日无记录数据</div>';
       }
       const r = col.row;
       const failed = Math.max(0, r.requests - r.successes);
       const rate = r.requests > 0 ? (r.successes / r.requests * 100).toFixed(1) + '%' : '–';
       const row = (k, v) => '<div class="tt-row"><span>' + k + '</span><b>' + v + '</b></div>';
       return '<div class="tt-date">' + esc(col.date) + '</div>' +
-        row('Requests', trendFmtFull(r.requests)) +
-        row('Successes', trendFmtFull(r.successes) + ' · ' + rate) +
-        row('Failed', trendFmtFull(failed)) +
-        row('Input tokens', trendFmtFull(r.input_tokens)) +
-        row('Output tokens', trendFmtFull(r.output_tokens)) +
-        row('Total tokens', trendFmtFull(r.input_tokens + r.output_tokens)) +
-        (r.cache_read ? row('Cache read', trendFmtFull(r.cache_read)) : '');
+        row('请求数', trendFmtFull(r.requests)) +
+        row('成功', trendFmtFull(r.successes) + ' · ' + rate) +
+        row('失败', trendFmtFull(failed)) +
+        row('输入 token', trendFmtFull(r.input_tokens)) +
+        row('输出 token', trendFmtFull(r.output_tokens)) +
+        row('总计 token', trendFmtFull(r.input_tokens + r.output_tokens)) +
+        (r.cache_read ? row('缓存读取', trendFmtFull(r.cache_read)) : '');
     }
 
     function trendTipPos(cx, cy) {

@@ -1,57 +1,57 @@
 # OneGate
 
-Multi-provider AI reverse proxy with token management and admin panel.
+多提供商 AI 反向代理，内置 token 管理与管理员面板。
 
-Route requests to different upstream AI providers by URL prefix, with per-token provider permission control, a token pool backed by SQLite, and a web-based admin UI.
+按 URL 前缀将请求路由到不同的上游 AI 提供商，支持按 token 的提供商权限控制、基于 SQLite 的 token 池，以及基于 Web 的管理界面。
 
-## Features
+## 功能特性
 
-- **Multi-provider routing** -- `/oai/` -> OpenAI, `/glm/` -> BigModel, or any custom provider
-- **Longest-prefix matching** -- most specific prefix wins; `/` is the fallback
-- **Token pool** -- SQLite-backed token storage with auto-migration from legacy `pool.json`
-- **Per-token permissions** -- restrict each token to specific providers; `["*"]` for all
-- **Model catalog** -- site-wide public model ids mapped to a provider and upstream model name
-- **Per-token model visibility** -- restrict each token to an allowlist of catalog model ids; `["*"]` for all
-- **OpenAI-compatible model listing** -- `GET /v1/models` returns the catalog entries the calling token may use
-- **Admin panel** -- web UI at `/admin?token=<admin_token>` for CRUD on tokens
-- **Status dashboard** -- token-scoped provider uptime and success stats at `/status`
-- **Admin self-protection** -- cannot demote, disable, or delete your own admin account
-- **Request logging** -- optional full request/response logging to SQLite
+- **多提供商路由** -- `/oai/` -> OpenAI、`/glm/` -> BigModel，或任意自定义提供商
+- **最长前缀匹配** -- 最具体的前缀优先；`/` 作为兜底
+- **Token 池** -- 基于 SQLite 的 token 存储，可从旧版 `pool.json` 自动迁移
+- **按 token 权限** -- 将每个 token 限制到指定提供商；`["*"]` 表示全部
+- **模型目录** -- 站点级的公共 model id，映射到某个提供商及上游模型名
+- **按 token 的模型可见性** -- 将每个 token 限制到目录 model id 白名单；`["*"]` 表示全部
+- **OpenAI 兼容的模型列表** -- `GET /v1/models` 返回调用 token 可使用的目录条目
+- **管理面板** -- 位于 `/admin?token=<admin_token>` 的 Web 界面，用于 token 增删改查
+- **状态看板** -- 位于 `/status` 的按 token 划分的提供商可用性与成功率统计
+- **管理员自我保护** -- 无法降级、禁用或删除自己的管理员账号
+- **请求日志** -- 可选的完整请求/响应日志，写入 SQLite
 
-## Prerequisites
+## 前置要求
 
 - Python >= 3.12
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- [uv](https://docs.astral.sh/uv/)（推荐）或 pip
 
-## Quick Start
+## 快速开始
 
 ```bash
 cp .env.example .env
 cp config.toml.example config.toml
 ```
 
-Edit `.env` and `config.toml` with your real API keys and admin tokens.
+编辑 `.env` 与 `config.toml`，填入真实的 API key 与管理员 token。
 
-If no admin tokens are configured, one will be auto-generated on first startup and printed to the console.
+若未配置管理员 token，首次启动时会自动生成一个并打印到控制台。
 
 ```bash
 uv sync
 uv run python proxy.py
 ```
 
-The proxy starts on `http://0.0.0.0:5678` by default.
+默认情况下，代理监听 `http://0.0.0.0:5678`。
 
-## Configuration
+## 配置
 
 ### `.env`
 
-| Variable | Description |
+| 变量 | 说明 |
 |---|---|
-| `TOKEN_OPENAI` | API key for OpenAI provider |
-| `TOKEN_ANTHROPIC` | API key for Anthropic provider |
-| `TOKEN_GROK` | API key for Grok (x.ai) provider |
-| `POOL_COUNT` | Number of tokens to generate in pool (overrides `config.toml`) |
-| `ENABLE_LOG` | Set to `1` to enable request/response logging |
+| `TOKEN_OPENAI` | OpenAI 提供商的 API key |
+| `TOKEN_ANTHROPIC` | Anthropic 提供商的 API key |
+| `TOKEN_GROK` | Grok（x.ai）提供商的 API key |
+| `POOL_COUNT` | 池中生成的 token 数量（覆盖 `config.toml`） |
+| `ENABLE_LOG` | 设为 `1` 以启用请求/响应日志 |
 
 ### `config.toml`
 
@@ -89,20 +89,20 @@ strip_prefix = false
 env_token = "TOKEN_OPENAI"
 ```
 
-Each provider entry:
+每个提供商条目：
 
-| Field | Description |
+| 字段 | 说明 |
 |---|---|
-| `prefix` | URL path prefix to match (longest match wins) |
-| `upstream` | Upstream API base URL |
-| `strip_prefix` | Remove the prefix before forwarding |
-| `env_token` | `.env` variable name holding the real API key |
+| `prefix` | 要匹配的 URL 路径前缀（最长匹配优先） |
+| `upstream` | 上游 API 基础 URL |
+| `strip_prefix` | 转发前移除前缀 |
+| `env_token` | 保存真实 API key 的 `.env` 变量名 |
 
-### Example: one upstream, one key per model family
+### 示例：一个上游，每个模型系列一把 key
 
-When an OpenAI-compatible gateway issues a different key per model, register one
-provider block per key with the same `upstream` but distinct `prefix`. Each key
-then gets its own usage/status bucket, and the model name is forwarded untouched.
+当某个 OpenAI 兼容网关为每个模型签发不同的 key 时，为每把 key 注册一个
+提供商块，使用相同的 `upstream` 但不同的 `prefix`。这样每把 key 都有各自的
+用量/状态分桶，模型名原样转发。
 
 ```toml
 [providers.gjzq-glm]
@@ -118,7 +118,7 @@ strip_prefix = true
 env_token = "TOKEN_GJZQ_DS"
 ```
 
-Clients keep the standard OpenAI shape — the prefix only replaces the host part:
+客户端保持标准 OpenAI 形态 —— 前缀只替换 host 部分：
 
 ```python
 from openai import OpenAI
@@ -133,57 +133,51 @@ client.chat.completions.create(
 )
 ```
 
-`POST /gjzq/glm/v1/chat/completions` -> `https://gpt.gjzq.cn/prod-api/v1/chat/completions`.
-The proxy token is validated against the pool, then swapped for `TOKEN_GJZQ_GLM`
-before forwarding. Note that some upstreams sit behind a WAF that rejects
-scripting User-Agents (e.g. `curl/*`); clients normally send their own UA, and
-`privacy.ua_override` is the global escape hatch if one is blocked.
+`POST /gjzq/glm/v1/chat/completions` -> `https://gpt.gjzq.cn/prod-api/v1/chat/completions`。
+proxy token 先经 token 池校验，再换成 `TOKEN_GJZQ_GLM` 后转发。注意部分上游
+位于 WAF 之后，会拒绝脚本类 User-Agent（如 `curl/*`）；客户端通常发送自己的
+UA，若被拦截，`privacy.ua_override` 是全局的兜底开关。
 
-## Admin Panel
+## 管理面板
 
-Access at `/admin?token=<admin_token>`.
+访问 `/admin?token=<admin_token>`。
 
-From the admin panel you can:
+在管理面板中你可以：
 
-- View all tokens and their provider permissions
-- Create new tokens with specific provider access
-- Toggle admin / enabled status
-- Delete tokens (with self-protection for your own admin)
+- 查看所有 token 及其提供商权限
+- 创建带有指定提供商访问权限的新 token
+- 切换管理员/启用状态
+- 删除 token（对自己的管理员账号有自我保护）
 
-### Model catalog
+### 模型目录
 
-The `/models` page (admin token required) maintains a site-wide catalog of
-public model ids. Each entry maps a model id to a configured provider and an
-optional upstream model name (`target`), and can be enabled or disabled.
+`/models` 页面（需要管理员 token）维护一个站点级的公共 model id 目录。每个条目
+将 model id 映射到一个已配置的提供商以及可选的上游模型名（`target`），并可启用
+或禁用。
 
-A catalog entry may also be a wildcard or regex rule, e.g. `glm-*` or
-`^claude-(.+)$`. Incoming model names are matched in this order: exact id
-first, then pattern entries (longest first) tried as a regex full match and
-then as an `fnmatch` wildcard. `target` may reference regex capture groups with
-`$1`..`$n`; an empty target forwards the requested name unchanged. Pattern
-rules route requests but are not returned by `/v1/models`, which only lists
-concrete model ids.
+目录条目也可以是通配符或正则规则，例如 `glm-*` 或 `^claude-(.+)$`。传入的模型名
+按以下顺序匹配：先精确匹配 id，再依次尝试模式条目（最长者优先），先作正则完整
+匹配，再作 `fnmatch` 通配匹配。`target` 可以用 `$1`..`$n` 引用正则捕获组；`target`
+为空时原样转发请求的模型名。模式规则只用于路由请求，不会由 `/v1/models` 返回，
+后者只列出具体的 model id。
 
-`GET /v1/models` (also `/v1/model`, plus `/v1/models/{model}` for one entry) is authenticated with the normal
-proxy Bearer token and returns only catalog entries the token may use, based on
-its provider permissions and model allowlist. Chat and responses requests
-resolve a model in this order: per-token mapping rules, then the site catalog
-(exact, then pattern rules), then the requested model unchanged on the default
-provider.
+`GET /v1/models`（以及 `/v1/model`，单个条目用 `/v1/models/{model}`）使用普通
+proxy Bearer token 认证，仅返回该 token 有权使用的目录条目，依据是其提供商权限
+与模型白名单。chat 与 responses 请求按以下顺序解析模型：先按 token 级映射规则，
+再查站点目录（精确匹配，然后模式规则），最后在默认提供商上原样使用请求的模型。
 
-## Status Page
+## 状态页
 
-The `/status` page shows per-provider uptime, hourly success rates, and summary
-stats. Its data endpoint, `GET /status/api`, requires a proxy token in the
-`X-Proxy-Token` header and returns only the providers that token is allowed to
-use, so each visitor sees their own slice of the dashboard. A token with
-`providers = ["*"]` sees every configured provider group.
+`/status` 页面展示各提供商的可用性、每小时成功率与汇总统计。其数据端点
+`GET /status/api` 要求在 `X-Proxy-Token` 头中携带 proxy token，只返回该 token
+有权使用的提供商，因此每位访问者只看到自己那份看板。带有 `providers = ["*"]`
+的 token 可看到全部已配置的提供商分组。
 
 ```bash
 curl -H "X-Proxy-Token: <proxy token>" http://<onegate-host>:5678/status/api
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 proxy.py                  # Entry point
@@ -205,14 +199,14 @@ tests/
   test_handlers.py        # Integration tests
 ```
 
-## Testing
+## 测试
 
 ```bash
 uv sync --extra dev
 uv run pytest tests/ -v
 ```
 
-## Systemd Deployment
+## Systemd 部署
 
 ```bash
 cp onegate.service.example onegate.service
@@ -222,13 +216,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now onegate
 ```
 
-After code changes, clear `__pycache__` before restarting:
+代码改动后，重启前先清理 `__pycache__`：
 
 ```bash
 find /path/to/onegate -type d -name __pycache__ -exec rm -rf {} +
 sudo systemctl restart onegate
 ```
 
-## License
+## 许可证
 
 MIT

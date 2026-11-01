@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Throughput Monitor</title>
+  <title>吞吐监控</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .login-overlay {
       display: flex;
@@ -379,13 +379,13 @@
 <body>
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Throughput Monitor</h2>
+      <h2>吞吐监控</h2>
       <div class="form-group">
         <label>Proxy Token</label>
-        <input type="text" id="login-token" placeholder="enter proxy token to monitor..." autofocus>
+        <input type="text" id="login-token" placeholder="请输入你的 proxy token…" autofocus>
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Monitor</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">监控</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
@@ -395,59 +395,59 @@
     <script>
       OneGateHeader.mount('#og-header', {
         active: 'throughput',
-        title: 'Throughput Monitor',
-        actions: '<div class="info" id="status-info"></div><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+        title: '吞吐监控',
+        actions: '<div class="info" id="status-info"></div><button class="btn btn-sm" onclick="doLogout()">退出登录</button>'
       });
     </script>
     <div class="container">
       <div class="status-bar">
-        <span><span class="status-dot connecting" id="status-dot"></span><span id="status-text">Connecting...</span></span>
-        <span>Requests: <strong id="req-count">0</strong></span>
-        <span>Active: <strong id="active-count">0</strong></span>
+        <span><span class="status-dot connecting" id="status-dot"></span><span id="status-text">连接中……</span></span>
+        <span>请求数：<strong id="req-count">0</strong></span>
+        <span>活跃：<strong id="active-count">0</strong></span>
       </div>
 
       <div class="card">
-        <h3>Summary</h3>
+        <h3>汇总</h3>
         <div class="summary-grid" id="summary-grid">
-          <div class="summary-item"><div class="value" id="sum-avg-in">-</div><div class="label">Avg Input Tokens</div></div>
-          <div class="summary-item"><div class="value" id="sum-avg-out">-</div><div class="label">Avg Output Tokens</div></div>
-          <div class="summary-item"><div class="value" id="sum-avg-tps">-</div><div class="label">Avg Output TPS</div></div>
-          <div class="summary-item"><div class="value" id="sum-avg-dur">-</div><div class="label">Avg Duration</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-in">-</div><div class="label">平均输入 Token</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-out">-</div><div class="label">平均输出 Token</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-tps">-</div><div class="label">平均输出 TPS</div></div>
+          <div class="summary-item"><div class="value" id="sum-avg-dur">-</div><div class="label">平均耗时</div></div>
         </div>
       </div>
 
       <div class="card" id="limits-card" style="display:none">
-        <h3>Rate Limits</h3>
+        <h3>速率限制</h3>
         <div class="limits-grid" id="limits-grid"></div>
       </div>
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3 style="margin:0">Live Requests</h3>
-          <button class="btn btn-sm" onclick="clearTable()">Clear</button>
+          <h3 style="margin:0">实时请求</h3>
+          <button class="btn btn-sm" onclick="clearTable()">清空</button>
         </div>
         <div style="overflow-x:auto">
           <table style="width:max-content;min-width:100%">
             <thead>
               <tr>
                 <th class="col-status"></th>
-                <th class="col-time">Time</th>
-                <th class="col-model">Model</th>
-                <th class="col-provider">Provider</th>
-                <th class="col-num">Input</th>
-                <th class="col-num">Output</th>
+                <th class="col-time">时间</th>
+                <th class="col-model">模型</th>
+                <th class="col-provider">提供商</th>
+                <th class="col-num">输入</th>
+                <th class="col-num">输出</th>
                 <th class="col-num">TTFT</th>
-                <th class="col-num">Duration</th>
+                <th class="col-num">耗时</th>
                 <th class="col-num">TPS</th>
-                <th class="col-status">Code</th>
-                <th class="col-url">Request</th>
-                <th class="col-url">Target</th>
+                <th class="col-status">状态码</th>
+                <th class="col-url">请求</th>
+                <th class="col-url">目标</th>
               </tr>
             </thead>
             <tbody id="req-tbody"></tbody>
           </table>
         </div>
-        <div id="empty-state" class="empty-state">Waiting for requests...</div>
+        <div id="empty-state" class="empty-state">等待请求中……</div>
       </div>
     </div>
   </div>
@@ -479,7 +479,7 @@
       if (liveTimer) return;
       liveTimer = setInterval(() => {
         if (eventSource && lastActivity && Date.now() - lastActivity > 40000) {
-          forceReconnect('Stream stalled, reconnecting...');
+          forceReconnect('stream 停滞，正在重连……');
           return;
         }
         const now = Date.now();
@@ -507,7 +507,7 @@
     async function doLogin() {
       const token = document.getElementById('login-token').value.trim();
       if (!token) {
-        document.getElementById('login-error').textContent = 'Please enter a token';
+        document.getElementById('login-error').textContent = '请输入你的 proxy token';
         return;
       }
       document.getElementById('login-error').textContent = '';
@@ -524,7 +524,7 @@
         });
         const data = await resp.json();
         if (!resp.ok) {
-          document.getElementById('login-error').textContent = data.error || 'Failed';
+          document.getElementById('login-error').textContent = data.error || '失败';
           proxyToken = null;
           return;
         }
@@ -534,7 +534,7 @@
         document.getElementById('main-content').classList.add('active');
         connectSSE();
       } catch (e) {
-        document.getElementById('login-error').textContent = 'Network error';
+        document.getElementById('login-error').textContent = '网络错误';
         proxyToken = null;
       }
     }
@@ -598,7 +598,7 @@
       const delay = Math.min(15000, 1000 * Math.pow(2, reconnectAttempts));
       reconnectAttempts++;
       if (reconnectAttempts > 1) {
-        statusText.textContent = 'Reconnecting in ' + Math.round(delay / 1000) + 's...';
+        statusText.textContent = Math.round(delay / 1000) + ' 秒后重连……';
       }
       reconnectTimer = setTimeout(reopenSession, delay);
     }
@@ -616,10 +616,10 @@
         if (!resp.ok) {
           if (resp.status === 403 || resp.status === 404) {
             statusDot.className = 'status-dot disconnected';
-            statusText.textContent = 'Session invalid, please log in again';
+            statusText.textContent = '会话无效，请重新登录';
             return;
           }
-          throw new Error(data.error || 'Failed');
+          throw new Error(data.error || '失败');
         }
         sessionId = data.session_id;
         connectSSE();
@@ -643,7 +643,7 @@
           everConnected = true;
           resetStats();
         }
-        statusText.textContent = 'Connected';
+        statusText.textContent = '已连接';
         startLiveTimer();
       });
 
@@ -707,7 +707,7 @@
 
       eventSource.onerror = () => {
         statusDot.className = 'status-dot disconnected';
-        statusText.textContent = 'Connection lost, reconnecting...';
+        statusText.textContent = '连接已断开，正在重连……';
         stopLiveTimer();
         if (eventSource) {
           eventSource.close();
@@ -736,10 +736,10 @@
         const pct = Math.max(0, Math.min(100, l.percent));
         const over = l.percent > 100;
         const barColor = over ? '#f85149' : (l.percent > 80 ? '#d29922' : '#58a6ff');
-        const resetTxt = l.reset_in == null ? '' : ' · reset ' + fmtReset(l.reset_in);
+        const resetTxt = l.reset_in == null ? '' : ' · 重置 ' + fmtReset(l.reset_in);
         return '<div class="limit-item">' +
           '<div class="limit-head"><span class="limit-label">' + l.label + '</span>' +
-          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + l.unit + resetTxt + (over ? ' · OVER' : '') + '</span></div>' +
+          '<span class="limit-val">' + l.used + ' / ' + l.limit + ' ' + l.unit + resetTxt + (over ? ' · 超限' : '') + '</span></div>' +
           '<div class="limit-bar"><div class="limit-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
           '</div>';
       }).join('');
@@ -933,16 +933,16 @@
       const row = (label, value) => '<div class="tt-row"><span class="tt-label">' + label + ':</span> <span class="tt-value">' + esc(String(value || '-')) + '</span></div>';
       let html = '';
       html += row('ID', req.id);
-      html += row('Model', req.model);
-      html += row('Provider', req.provider);
-      html += row('Status', req.status != null ? req.status : 'streaming...');
-      html += row('Input Tokens', (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens));
-      html += row('Output Tokens', fmtNum(req.output_tokens));
+      html += row('模型', req.model);
+      html += row('提供商', req.provider);
+      html += row('状态', req.status != null ? req.status : 'stream 中……');
+      html += row('输入 Token', (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens));
+      html += row('输出 Token', fmtNum(req.output_tokens));
       html += row('TPS', fmtTps(req.tps));
-      html += row('Duration', fmtDur(req.duration_ms));
+      html += row('耗时', fmtDur(req.duration_ms));
       html += row('TTFT', fmtTTFT(req.ttft_ms, req.time, req.finished));
-      html += row('Request URL', req.request_url);
-      html += row('Target URL', req.target_url);
+      html += row('请求 URL', req.request_url);
+      html += row('目标 URL', req.target_url);
       return html;
     }
 
@@ -954,7 +954,7 @@
 
     function detailFields(req) {
       return {
-        status: req.status != null ? req.status : 'streaming...',
+        status: req.status != null ? req.status : 'stream 中……',
         input: (req.input_estimated ? '~' : '') + fmtNum(req.input_tokens),
         output: fmtNum(req.output_tokens),
         tps: fmtTps(req.tps),
@@ -965,19 +965,19 @@
 
     function buildDetailHtml(req) {
       const f = detailFields(req);
-      let html = '<div style="font-size:14px;font-weight:600;color:#58a6ff;margin-bottom:8px">Request #' + esc(req.id || '') + '</div>';
-      html += detailRow('Model', req.model);
-      html += detailRow('Provider', req.provider);
-      html += detailRow('Status', f.status, 'status');
-      html += detailRow('Input Tokens', f.input, 'input');
-      html += detailRow('Output Tokens', f.output, 'output');
+      let html = '<div style="font-size:14px;font-weight:600;color:#58a6ff;margin-bottom:8px">请求 #' + esc(req.id || '') + '</div>';
+      html += detailRow('模型', req.model);
+      html += detailRow('提供商', req.provider);
+      html += detailRow('状态', f.status, 'status');
+      html += detailRow('输入 Token', f.input, 'input');
+      html += detailRow('输出 Token', f.output, 'output');
       html += detailRow('TPS', f.tps, 'tps');
-      html += detailRow('Duration', f.duration, 'duration');
+      html += detailRow('耗时', f.duration, 'duration');
       html += detailRow('TTFT', f.ttft, 'ttft');
-      html += detailRow('Request URL', req.request_url);
-      html += detailRow('Target URL', req.target_url);
+      html += detailRow('请求 URL', req.request_url);
+      html += detailRow('目标 URL', req.target_url);
       if (req.request_headers && Object.keys(req.request_headers).length) {
-        html += '<details class="detail-section" open><summary>Request Headers</summary>';
+        html += '<details class="detail-section" open><summary>请求头</summary>';
         html += '<div class="headers-grid">';
         for (const [k, v] of Object.entries(req.request_headers)) {
           html += '<div><span class="hk">' + esc(k) + '</span>: <span class="hv">' + esc(v) + '</span></div>';
@@ -985,14 +985,14 @@
         html += '</div></details>';
       }
       if (req.request_body) {
-        html += '<details class="detail-section" open><summary>Request Body</summary>';
-        if (req.request_body_truncated) html += '<div class="truncated-notice">Truncated at 100KB</div>';
+        html += '<details class="detail-section" open><summary>请求体</summary>';
+        if (req.request_body_truncated) html += '<div class="truncated-notice">已截断至 100KB</div>';
         html += '<div class="body-block">' + esc(prettyJson(req.request_body)) + '</div></details>';
       }
-      html += '<details class="detail-section" data-sec="resp-headers" style="display:none"><summary>Response Headers</summary>'
+      html += '<details class="detail-section" data-sec="resp-headers" style="display:none"><summary>响应头</summary>'
         + '<div class="headers-grid" data-tt-headers></div></details>';
-      html += '<details class="detail-section" data-sec="resp-body" style="display:none"><summary>Response Body</summary>'
-        + '<div class="truncated-notice" data-tt-resp-trunc style="display:none">Truncated at 100KB</div>'
+      html += '<details class="detail-section" data-sec="resp-body" style="display:none"><summary>响应体</summary>'
+        + '<div class="truncated-notice" data-tt-resp-trunc style="display:none">已截断至 100KB</div>'
         + '<div class="body-block" data-tt-body></div></details>';
       return html;
     }

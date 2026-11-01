@@ -225,10 +225,10 @@ def create_throughput_handlers(monitor: ThroughputMonitor, token_pool: dict, db_
 
 
 class ThroughputTracker:
-    """Per-request throughput tracking state.
+    """单次请求的吞吐追踪状态。
 
-    Tracks input/output token estimates, TTFT, duration, and TPS for a single
-    proxied request, broadcasting progress and final stats to SSE monitor sessions.
+    追踪单次经代理请求的输入/输出 token 估算、TTFT、耗时与 TPS，
+    并向 SSE 监控会话广播进度与最终统计。
     """
 
     def __init__(

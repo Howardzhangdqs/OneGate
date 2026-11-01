@@ -69,7 +69,7 @@ def _migrate_old_schema(conn: sqlite3.Connection):
 
 def _migrate_rate_limit_columns(conn: sqlite3.Connection):
     cols = _get_columns(conn, "token_pool")
-    # Rate-limit columns default to -1 (unlimited); 0 means "blocked".
+    # 速率限制列默认 -1（不限）；0 表示“已封禁”。
     rate_cols = [
         ("rpm", "INTEGER", -1),
         ("rph", "INTEGER", -1),
@@ -85,7 +85,7 @@ def _migrate_rate_limit_columns(conn: sqlite3.Connection):
         ("tpmo", "INTEGER", -1),
         ("tpt", "INTEGER", -1),
         ("token_count", "INTEGER", 0),
-        # Cache-token weights: -1 = inherit global default, >=0 = explicit override.
+        # 缓存 token 权重：-1 = 继承全局默认值，>=0 = 显式覆盖。
         ("cache_read_weight", "REAL", -1),
         ("cache_write_weight", "REAL", -1),
     ]
@@ -142,9 +142,9 @@ def _migrate_token_usage_log(conn: sqlite3.Connection):
 
 
 def _migrate_usage_model_column(conn: sqlite3.Connection):
-    # Add a `model` column to the per-token and per-client usage logs and fold
-    # it into the primary key so usage can be broken down by model. SQLite can't
-    # ALTER a primary key in place, so rebuild via the _new pattern used elsewhere.
+    # 为按 token 与按客户端的用量日志添加 `model` 列，并把它并入主键，
+    # 以便按模型拆分用量。SQLite 无法就地 ALTER 主键，因此沿用其他
+    # 地方的 _new 模式重建表。
     rebuilds = [
         (
             "token_usage_log",
@@ -529,8 +529,8 @@ def init_db(
         )
         conn.commit()
 
-    # One-time backfill: legacy auto-created tokens inherited a rate-limit
-    # default of 0 (= blocked). Flip the all-zero signature back to unlimited.
+    # 一次性回填：旧版自动创建的 token 继承了 0（= 已封禁）的速率限制
+    # 默认值。将全零特征翻回不限。
     db_version = conn.execute("PRAGMA user_version").fetchone()[0]
     if db_version < 1:
         flipped = conn.execute(
@@ -1542,11 +1542,11 @@ def update_token(
     if not entry:
         return None
 
-    # Resolve an optional token rename. ``new_token`` semantics:
-    #   None  -> not provided, keep current token (e.g. toggleEnabled path)
-    #   ""    -> empty, auto-generate a fresh token (regenerate)
-    #   ==token -> no-op
-    #   else  -> rename to this value (must be unique)
+    # 解析可选的 token 重命名。``new_token`` 语义：
+    #   None  -> 未提供，保留当前 token（例如 toggleEnabled 路径）
+    #   ""    -> 空值，自动生成新 token（重置）
+    #   ==token -> 不操作
+    #   else  -> 重命名为该值（必须唯一）
     rename_to: str | None = None
     if new_token is not None:
         nt = new_token.strip()
@@ -1603,7 +1603,7 @@ def update_token(
         entry.models = models
 
     if rename_to:
-        # token is the PRIMARY KEY of token_pool -> update it explicitly.
+        # token 是 token_pool 的 PRIMARY KEY -> 需显式更新。
         conn.execute(
             "UPDATE token_pool SET token=?, providers=?, is_admin=?, enabled=?, describe=?, "
             "rpm=?, rph=?, rpd=?, rpw=?, rpmo=?, rpt=?, "
@@ -1633,7 +1633,7 @@ def update_token(
                 token,
             ),
         )
-        # Keep usage history and model mappings attached to the renamed token.
+        # 保持用量历史与模型映射仍挂在重命名后的 token 上。
         for tbl in (
             "request_log",
             "success_log",
@@ -2117,8 +2117,8 @@ def get_token_usage_by_model(
             "cache_write": cw or 0,
             "requests": 0,
         }
-    # token_usage_log has no request count column; derive requests from
-    # client_token_usage_log counts grouped by model when available.
+    # token_usage_log 没有请求数计列；请求数从
+    # client_token_usage_log 的计数在可用时按模型分组得出。
     req_by_model = conn.execute(
         "SELECT model, SUM(count) FROM client_token_usage_log "
         + where

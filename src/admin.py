@@ -207,8 +207,8 @@ def create_admin_handlers(
         if not entry:
             return web.json_response({"error": "token not found"}, status=404)
 
-        # If the token was renamed, drop the old key from the in-memory auth
-        # pool so the previous value stops authenticating immediately.
+        # 如果 token 被重命名，从内存中的认证池移除旧键，
+        # 使旧值立即停止通过认证。
         if entry.token != target:
             token_pool.pop(target, None)
         token_pool[entry.token] = entry

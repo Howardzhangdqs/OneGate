@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OneGate</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .hero {
       text-align: center;
@@ -93,50 +93,50 @@
 
   <div class="hero">
     <h1>OneGate</h1>
-    <p>A unified gateway to multiple AI providers. Handles authentication, routing, rate limiting, and usage tracking so you can focus on building.</p>
+    <p>统一的 AI 多提供商网关。负责认证、路由、速率限制与用量追踪，让你专注于构建。</p>
   </div>
 
   <div class="container">
     <div class="nav-grid">
       <a class="nav-card" href="/status">
-        <span class="title">Service Status</span>
-        <span class="desc">Sign in with your proxy token to see provider health, success rates, and hourly trends for the providers you can use.</span>
-        <span class="badge public">Token Required</span>
+        <span class="title">服务状态</span>
+        <span class="desc">使用你的 proxy token 登录，查看你可使用的提供商的健康状况、成功率以及每小时趋势。</span>
+        <span class="badge public">需要 Token</span>
       </a>
       <a class="nav-card" href="/usage">
-        <span class="title">Usage Query</span>
-        <span class="desc">Look up API call statistics by token with hourly, daily, and per-provider breakdowns.</span>
-        <span class="badge public">Token Required</span>
+        <span class="title">用量查询</span>
+        <span class="desc">按 token 查询 API 调用统计，支持每小时、每日及按提供商细分。</span>
+        <span class="badge public">需要 Token</span>
       </a>
       <a class="nav-card" href="/admin">
-        <span class="title">Token Admin</span>
-        <span class="desc">Create, edit, and delete proxy tokens. Configure rate limits and provider permissions.</span>
-        <span class="badge">Admin Only</span>
+        <span class="title">Token 管理</span>
+        <span class="desc">创建、编辑和删除 proxy token。配置速率限制与提供商权限。</span>
+        <span class="badge">仅管理员</span>
       </a>
       <a class="nav-card" href="/mapping">
-        <span class="title">Model Mapping</span>
-        <span class="desc">Define custom model name mapping rules with wildcard pattern matching for your token.</span>
-        <span class="badge public">Token Required</span>
+        <span class="title">模型映射</span>
+        <span class="desc">为你的 token 定义使用通配符模式匹配的自定义模型名映射规则。</span>
+        <span class="badge public">需要 Token</span>
       </a>
       <a class="nav-card" href="/models">
-        <span class="title">Model Catalog</span>
-        <span class="desc">Browse the model ids clients can call, and which provider and upstream model each id maps to.</span>
-        <span class="badge">Admin Only</span>
+        <span class="title">模型目录</span>
+        <span class="desc">浏览客户端可调用的模型 id，以及每个 id 映射到哪个提供商和上游模型。</span>
+        <span class="badge">仅管理员</span>
       </a>
       <a class="nav-card" href="/pricing">
-        <span class="title">Model Pricing</span>
-        <span class="desc">View per-model token pricing (input/output, cache hit/miss). Admins can edit prices.</span>
-        <span class="badge public">Public</span>
+        <span class="title">模型定价</span>
+        <span class="desc">查看各模型的 token 定价（输入/输出，缓存命中/未命中）。管理员可编辑价格。</span>
+        <span class="badge public">公开</span>
       </a>
       <a class="nav-card" href="/throughput">
-        <span class="title">Throughput Monitor</span>
-        <span class="desc">Real-time monitoring of active requests, TPS, TTFT, and other key performance metrics.</span>
-        <span class="badge public">Token Required</span>
+        <span class="title">吞吐监控</span>
+        <span class="desc">实时监控活跃请求、TPS、TTFT 及其他关键性能指标。</span>
+        <span class="badge public">需要 Token</span>
       </a>
       <a class="nav-card" href="/clients">
-        <span class="title">Client Stats</span>
-        <span class="desc">Identify which AI coding tools (Claude Code, Codex, OpenCode, etc.) each token uses, with request distribution and trends.</span>
-        <span class="badge public">Public</span>
+        <span class="title">客户端统计</span>
+        <span class="desc">识别每个 token 使用哪些 AI 编码工具（Claude Code、Codex、OpenCode 等），并查看请求分布与趋势。</span>
+        <span class="badge public">公开</span>
       </a>
     </div>
   </div>

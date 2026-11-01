@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Model Catalog</title>
+  <title>模型目录</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .toolbar {
       display: flex;
@@ -536,13 +536,13 @@
 
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Admin Login</h2>
+      <h2>管理员登录</h2>
       <div class="form-group">
-        <label>Admin Token</label>
-        <input type="text" id="login-token" placeholder="enter admin token..." autofocus>
+        <label>管理员 Token</label>
+        <input type="text" id="login-token" placeholder="请输入管理员 Token…" autofocus>
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">登录</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
@@ -552,27 +552,27 @@
     <script>
       OneGateHeader.mount('#og-header', {
         active: 'models',
-        title: 'Model Catalog',
-        actions: '<div class="info" id="stats"></div><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+        title: '模型目录',
+        actions: '<div class="info" id="stats"></div><button class="btn btn-sm" onclick="doLogout()">退出登录</button>'
       });
     </script>
 
     <div class="container">
       <div class="toolbar">
-        <h2 id="model-count">Models</h2>
+        <h2 id="model-count">模型</h2>
         <div class="toolbar-actions">
-          <button class="btn" onclick="loadModels()">Refresh</button>
-          <button class="btn btn-primary" onclick="showAddModal()">+ Add Model</button>
+          <button class="btn" onclick="loadModels()">刷新</button>
+          <button class="btn btn-primary" onclick="showAddModal()">+ 添加模型</button>
         </div>
       </div>
 
       <div class="callout">
         <i class="callout-icon" aria-hidden="true">i</i>
         <div>
-          <strong>How the catalog works.</strong> Clients call <code>GET /v1/models</code> with their proxy token and
-          receive the ids they are allowed to see. A chat or Responses request that uses one of those ids is forwarded
-          to the provider and upstream model set here. Which ids each token can see is managed in
-          <a href="/admin">Admin</a> &rarr; Tokens &rarr; Visible models.
+          <strong>模型目录的工作方式。</strong>客户端使用自己的 proxy token 调用 <code>GET /v1/models</code>，
+          获取其有权看到的 id。使用其中任一 id 的 chat 或 Responses 请求，会被转发到此处设置的提供商和
+          上游模型。每个 token 可见哪些 id，在 <a href="/admin">管理员</a> &rarr; Token &rarr; 可见模型
+          中管理。
         </div>
       </div>
 
@@ -580,16 +580,16 @@
         <table>
           <thead>
             <tr>
-              <th style="width:30%">Public model</th>
-              <th style="width:15%">Provider</th>
-              <th style="width:27%">Upstream model</th>
-              <th style="width:12%">Status</th>
-              <th style="width:16%" class="col-actions">Actions</th>
+              <th style="width:30%">公开模型</th>
+              <th style="width:15%">提供商</th>
+              <th style="width:27%">上游模型</th>
+              <th style="width:12%">状态</th>
+              <th style="width:16%" class="col-actions">操作</th>
             </tr>
           </thead>
           <tbody id="model-tbody">
             <tr>
-              <td colspan="5" class="empty">Loading...</td>
+              <td colspan="5" class="empty">加载中...</td>
             </tr>
           </tbody>
         </table>
@@ -598,42 +598,42 @@
 
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal">
-        <h3 id="modal-title">Add Model</h3>
+        <h3 id="modal-title">添加模型</h3>
         <div class="form-group">
-          <label for="modal-model">Model id or pattern <span class="pattern-badge" id="modal-pattern-badge" title="This entry is stored as a pattern rule" hidden>Pattern</span></label>
+          <label for="modal-model">模型 id 或模式 <span class="pattern-badge" id="modal-pattern-badge" title="该条目以模式规则存储" hidden>模式</span></label>
           <input type="text" id="modal-model" placeholder="glm-5.3 / glm-* / ^claude-(.+)$" autocomplete="off" spellcheck="false">
           <div class="hint">
-            Exact ids match first, then longer patterns before shorter ones. An entry containing
-            <code>* ? [ ] ( ) { } ^ $ | \ +</code> is a pattern: it is tried as a regex (full match), then as a
-            wildcard such as <code>glm-*</code>; invalid regex is ignored and the wildcard is used. Patterns route
-            requests but are not returned by <code>/v1/models</code>.
+            精确 id 优先匹配，其次按模式从长到短匹配。包含
+            <code>* ? [ ] ( ) { } ^ $ | \ +</code> 的条目视为模式：先按正则尝试（全匹配），再按
+            通配符（如 <code>glm-*</code>）尝试；正则无效时忽略正则并改用通配符。模式仅用于路由
+            请求，不会由 <code>/v1/models</code> 返回。
           </div>
         </div>
         <div class="form-group">
-          <label for="modal-provider">Provider</label>
+          <label for="modal-provider">提供商</label>
           <select id="modal-provider"></select>
-          <div class="hint">Requests matching this id are forwarded to the selected provider.</div>
+          <div class="hint">匹配该 id 的请求会被转发到所选提供商。</div>
         </div>
         <div class="form-group">
-          <label for="modal-target">Upstream model <span class="optional">optional</span></label>
-          <input type="text" id="modal-target" placeholder="e.g. glm-5.3 or glm-$1" autocomplete="off" spellcheck="false">
-          <div class="hint">Use <code>$1</code> <code>$2</code> … to insert regex capture groups. Leave empty to forward
-            the requested model name unchanged.</div>
+          <label for="modal-target">上游模型 <span class="optional">可选</span></label>
+          <input type="text" id="modal-target" placeholder="例如 glm-5.3 或 glm-$1" autocomplete="off" spellcheck="false">
+          <div class="hint">使用 <code>$1</code> <code>$2</code> … 插入正则捕获组。留空则原样转发
+            请求的模型名称。</div>
         </div>
         <div class="toggle-row">
           <div>
-            <div class="tr-label">Enabled</div>
-            <div class="tr-hint">Disabled models are hidden from /v1/models.</div>
+            <div class="tr-label">已启用</div>
+            <div class="tr-hint">已禁用的模型不会出现在 /v1/models 中。</div>
           </div>
           <label class="toggle">
-            <input type="checkbox" id="modal-enabled" aria-label="Enabled" checked>
+            <input type="checkbox" id="modal-enabled" aria-label="已启用" checked>
             <span class="slider"></span>
           </label>
         </div>
         <div class="modal-error" id="modal-error"></div>
         <div class="modal-actions">
-          <button class="btn" onclick="hideModal()">Cancel</button>
-          <button class="btn btn-primary" id="modal-submit" onclick="submitModel()">Add</button>
+          <button class="btn" onclick="hideModal()">取消</button>
+          <button class="btn btn-primary" id="modal-submit" onclick="submitModel()">添加</button>
         </div>
       </div>
     </div>
@@ -642,8 +642,8 @@
       <div class="confirm-box">
         <p id="confirm-message"></p>
         <div class="confirm-actions">
-          <button class="btn" onclick="confirmCancel()">Cancel</button>
-          <button class="btn btn-danger" onclick="confirmOk()">Delete</button>
+          <button class="btn" onclick="confirmCancel()">取消</button>
+          <button class="btn btn-danger" onclick="confirmOk()">删除</button>
         </div>
       </div>
     </div>
@@ -675,7 +675,7 @@
       try {
         resp = await fetch(API_BASE + path, opts);
       } catch (e) {
-        return { ok: false, status: 0, data: { error: 'Network error' } };
+        return { ok: false, status: 0, data: { error: '网络错误' } };
       }
       let data = {};
       try { data = await resp.json(); } catch (e) { data = {}; }
@@ -714,8 +714,8 @@
       const total = cachedModels.length;
       const enabled = cachedModels.filter(m => m.enabled).length;
       document.getElementById('model-count').innerHTML =
-        `${total} model(s) &middot; <span class="count-on">${enabled}</span> enabled`;
-      document.getElementById('stats').textContent = `${enabled} enabled / ${total} total`;
+        `${total} 个模型 &middot; <span class="count-on">${enabled}</span> 个已启用`;
+      document.getElementById('stats').textContent = `${enabled} 个已启用 / 共 ${total} 个`;
     }
 
     function renderRow(m) {
@@ -724,11 +724,11 @@
       const target = m.target || '';
       const pattern = isPattern(id);
       const idBadge = pattern
-        ? ' <span class="pattern-badge" title="Pattern rule: matches incoming model names and is not listed in /v1/models">Pattern</span>'
+        ? ' <span class="pattern-badge" title="模式规则：匹配传入的模型名称，且不会出现在 /v1/models 中">模式</span>'
         : '';
       const targetCell = target
         ? `<span class="target-cell">${esc(target)}</span>`
-        : `<span class="muted">${pattern ? 'Same as requested' : 'Same as public id'}</span>`;
+        : `<span class="muted">${pattern ? '同请求名称' : '同公开 id'}</span>`;
       const provCell = provider
         ? `<span class="tag prov-tag">${esc(provider)}</span>`
         : '<span class="muted">-</span>';
@@ -737,14 +737,14 @@
         <td>${provCell}</td>
         <td class="upstream-cell">${targetCell}</td>
         <td>
-          <label class="toggle" title="${m.enabled ? 'Enabled' : 'Disabled'}">
-            <input type="checkbox" ${m.enabled ? 'checked' : ''} aria-label="Enabled" data-model="${escAttr(id)}" onchange="toggleModel(this)">
+          <label class="toggle" title="${m.enabled ? '已启用' : '已禁用'}">
+            <input type="checkbox" ${m.enabled ? 'checked' : ''} aria-label="已启用" data-model="${escAttr(id)}" onchange="toggleModel(this)">
             <span class="slider"></span>
           </label>
         </td>
         <td class="col-actions" style="white-space:nowrap">
-          <button class="btn btn-sm" data-action="edit" data-model="${escAttr(id)}">Edit</button>
-          <button class="btn btn-sm btn-danger" data-action="delete" data-model="${escAttr(id)}">Delete</button>
+          <button class="btn btn-sm" data-action="edit" data-model="${escAttr(id)}">编辑</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-model="${escAttr(id)}">删除</button>
         </td>
       </tr>`;
     }
@@ -754,20 +754,20 @@
       if (!result.ok) {
         if (result.status === 403) {
           doLogout();
-          document.getElementById('login-error').textContent = 'Session expired, please log in again';
+          document.getElementById('login-error').textContent = '会话已过期，请重新登录';
           return;
         }
         document.getElementById('model-tbody').innerHTML =
-          '<tr><td colspan="5" class="empty">Failed to load the model catalog.</td></tr>';
-        document.getElementById('model-count').textContent = 'Models';
+          '<tr><td colspan="5" class="empty">加载模型目录失败。</td></tr>';
+        document.getElementById('model-count').textContent = '模型';
         document.getElementById('stats').textContent = '';
-        toast((result.data && result.data.error) || 'Failed to load models');
+        toast((result.data && result.data.error) || '加载模型失败');
         return;
       }
       cachedModels = (result.data.models || []).slice().sort((a, b) => String(a.model).localeCompare(String(b.model)));
       const tbody = document.getElementById('model-tbody');
       if (cachedModels.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">No models yet. Add one to make it available to clients.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无模型。添加一个即可供客户端使用。</td></tr>';
       } else {
         tbody.innerHTML = cachedModels.map(renderRow).join('');
       }
@@ -781,13 +781,13 @@
       if (selected && !names.includes(selected)) names.push(selected);
       const ph = document.createElement('option');
       ph.value = '';
-      ph.textContent = names.length ? 'Select a provider...' : 'No providers configured';
+      ph.textContent = names.length ? '请选择提供商…' : '未配置提供商';
       ph.disabled = true;
       sel.appendChild(ph);
       names.forEach(name => {
         const opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = PROVIDER_LIST.includes(name) ? name : name + ' (not configured)';
+        opt.textContent = PROVIDER_LIST.includes(name) ? name : name + '（未配置）';
         sel.appendChild(opt);
       });
       sel.value = selected && names.includes(selected) ? selected : '';
@@ -801,16 +801,16 @@
 
     function showAddModal() {
       if (PROVIDER_LIST.length === 0) {
-        toast('No providers are configured');
+        toast('未配置任何提供商');
         return;
       }
       editingModel = null;
-      document.getElementById('modal-title').textContent = 'Add Model';
+      document.getElementById('modal-title').textContent = '添加模型';
       document.getElementById('modal-model').value = '';
       document.getElementById('modal-target').value = '';
       document.getElementById('modal-enabled').checked = true;
       document.getElementById('modal-error').textContent = '';
-      document.getElementById('modal-submit').textContent = 'Add';
+      document.getElementById('modal-submit').textContent = '添加';
       populateProviderSelect('');
       syncPatternBadge();
       document.getElementById('modal-overlay').classList.add('active');
@@ -821,12 +821,12 @@
       const m = cachedModels.find(x => x.model === modelId);
       if (!m) return;
       editingModel = m;
-      document.getElementById('modal-title').textContent = 'Edit Model';
+      document.getElementById('modal-title').textContent = '编辑模型';
       document.getElementById('modal-model').value = m.model || '';
       document.getElementById('modal-target').value = m.target || '';
       document.getElementById('modal-enabled').checked = !!m.enabled;
       document.getElementById('modal-error').textContent = '';
-      document.getElementById('modal-submit').textContent = 'Save';
+      document.getElementById('modal-submit').textContent = '保存';
       populateProviderSelect(m.provider || '');
       syncPatternBadge();
       document.getElementById('modal-overlay').classList.add('active');
@@ -846,32 +846,32 @@
       const errEl = document.getElementById('modal-error');
       errEl.textContent = '';
       if (!model) {
-        errEl.textContent = 'Model id or pattern is required';
+        errEl.textContent = '模型 id 或模式为必填项';
         return;
       }
       if (!provider) {
-        errEl.textContent = 'Provider is required';
+        errEl.textContent = '提供商为必填项';
         return;
       }
       const duplicate = cachedModels.some(m => m.model === model && (!editingModel || m.model !== editingModel.model));
       if (duplicate) {
-        errEl.textContent = 'An entry with this id or pattern already exists';
+        errEl.textContent = '已存在相同 id 或模式的条目';
         return;
       }
       const wasEditing = !!editingModel;
       const previousId = editingModel ? editingModel.model : null;
       const result = await api('POST', '/admin/api/models', { model, provider, target, enabled });
       if (!result.ok) {
-        errEl.textContent = (result.data && result.data.error) || 'Failed to save model';
+        errEl.textContent = (result.data && result.data.error) || '保存模型失败';
         return;
       }
       if (wasEditing && previousId && previousId !== model) {
         const del = await api('DELETE', '/admin/api/models', { model: previousId });
-        if (!del.ok) toast((del.data && del.data.error) || 'Failed to remove the old model id');
+        if (!del.ok) toast((del.data && del.data.error) || '删除旧的模型 id 失败');
       }
       hideModal();
       await loadModels();
-      toast(wasEditing ? 'Model updated' : 'Model added', 'success');
+      toast(wasEditing ? '模型已更新' : '模型已添加', 'success');
     }
 
     async function toggleModel(checkbox) {
@@ -892,11 +892,11 @@
       checkbox.disabled = false;
       if (!result.ok) {
         checkbox.checked = !next;
-        toast((result.data && result.data.error) || 'Failed to update model');
+        toast((result.data && result.data.error) || '更新模型失败');
         return;
       }
       m.enabled = next;
-      checkbox.closest('.toggle').title = next ? 'Enabled' : 'Disabled';
+      checkbox.closest('.toggle').title = next ? '已启用' : '已禁用';
       updateCounts();
     }
 
@@ -917,15 +917,15 @@
     }
 
     async function confirmDelete(modelId) {
-      const ok = await showConfirm('Delete model "' + modelId + '" from the catalog?');
+      const ok = await showConfirm('从目录中删除模型“' + modelId + '”？');
       if (!ok) return;
       const result = await api('DELETE', '/admin/api/models', { model: modelId });
       if (!result.ok) {
-        toast((result.data && result.data.error) || 'Failed to delete model');
+        toast((result.data && result.data.error) || '删除模型失败');
         return;
       }
       await loadModels();
-      toast('Model deleted', 'success');
+      toast('模型已删除', 'success');
     }
 
     document.getElementById('model-tbody').addEventListener('click', e => {
@@ -961,7 +961,7 @@
     async function doLogin() {
       const token = document.getElementById('login-token').value.trim();
       if (!token) {
-        document.getElementById('login-error').textContent = 'Please enter a token';
+        document.getElementById('login-error').textContent = '请输入管理员 Token';
         return;
       }
       document.getElementById('login-error').textContent = '';
@@ -970,11 +970,11 @@
           headers: { 'X-Admin-Token': token },
         });
         if (resp.status === 403) {
-          document.getElementById('login-error').textContent = 'Invalid admin token';
+          document.getElementById('login-error').textContent = '管理员 Token 无效';
           return;
         }
         if (!resp.ok) {
-          document.getElementById('login-error').textContent = 'Login failed';
+          document.getElementById('login-error').textContent = '登录失败';
           return;
         }
         adminToken = token;
@@ -983,7 +983,7 @@
         document.getElementById('catalog-content').classList.add('active');
         loadModels();
       } catch (e) {
-        document.getElementById('login-error').textContent = 'Network error';
+        document.getElementById('login-error').textContent = '网络错误';
       }
     }
 

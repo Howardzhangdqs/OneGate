@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Model Mapping</title>
+  <title>模型映射</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .toolbar {
       display: flex;
@@ -339,14 +339,14 @@
 
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Model Mapping</h2>
-      <div class="subtitle">Enter your proxy token to manage model mapping rules</div>
+      <h2>模型映射</h2>
+      <div class="subtitle">输入你的 proxy token 以管理模型映射规则</div>
       <div class="form-group">
         <label>Proxy Token</label>
-        <input type="text" id="login-token" placeholder="enter your proxy token..." autofocus>
+        <input type="text" id="login-token" placeholder="请输入你的 proxy token…" autofocus>
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">登录</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
@@ -356,45 +356,45 @@
     <script>
       OneGateHeader.mount('#og-header', {
         active: 'mapping',
-        title: 'Model Mapping',
-        actions: '<div class="info" id="token-info"></div><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+        title: '模型映射',
+        actions: '<div class="info" id="token-info"></div><button class="btn btn-sm" onclick="doLogout()">退出登录</button>'
       });
     </script>
     <div class="container">
       <div class="toolbar">
         <h2 id="mapping-count"></h2>
-        <button class="btn" onclick="loadMappings()">Refresh</button>
+        <button class="btn" onclick="loadMappings()">刷新</button>
       </div>
 
       <div class="add-form">
         <div class="form-group">
-          <label>Pattern</label>
-          <input type="text" id="add-pattern" placeholder="e.g. glm-* or (.+-)(\\d+\\.\\d+)">
+          <label>模式</label>
+          <input type="text" id="add-pattern" placeholder="例如 glm-* 或 (.+-)(\\d+\\.\\d+)">
         </div>
         <div class="arrow">&rarr;</div>
         <div class="form-group">
-          <label>Target Model</label>
-          <input type="text" id="add-target" placeholder="e.g. glm-4 or $2">
+          <label>目标模型</label>
+          <input type="text" id="add-target" placeholder="例如 glm-4 或 $2">
         </div>
         <div class="form-group">
-          <label>Provider</label>
+          <label>提供商</label>
           <select id="add-provider" style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:13px;font-family:var(--font-all)">
-            <option value="">Default</option>
+            <option value="">默认</option>
           </select>
         </div>
-        <button class="btn btn-primary" id="add-btn" onclick="addMapping()" style="height:36px;flex-shrink:0">Add</button>
-        <button class="btn" id="cancel-btn" onclick="cancelEdit()" style="height:36px;flex-shrink:0;display:none">Cancel</button>
+        <button class="btn btn-primary" id="add-btn" onclick="addMapping()" style="height:36px;flex-shrink:0">添加</button>
+        <button class="btn" id="cancel-btn" onclick="cancelEdit()" style="height:36px;flex-shrink:0;display:none">取消</button>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th style="width:25%">Pattern</th>
-              <th style="width:8%">Arrow</th>
-              <th style="width:25%">Target Model</th>
-              <th style="width:22%">Provider</th>
-              <th style="width:20%" class="col-actions">Actions</th>
+              <th style="width:25%">模式</th>
+              <th style="width:8%">箭头</th>
+              <th style="width:25%">目标模型</th>
+              <th style="width:22%">提供商</th>
+              <th style="width:20%" class="col-actions">操作</th>
             </tr>
           </thead>
           <tbody id="mapping-tbody"></tbody>
@@ -402,34 +402,34 @@
       </div>
 
       <div class="rules-card">
-        <h3>Matching Rules</h3>
-        <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Patterns are first tried as <strong>regex</strong> (fullmatch), then fallback to <strong>fnmatch wildcards</strong>. Use <code>$1</code> <code>$2</code> ... in target to reference regex capture groups.</p>
+        <h3>匹配规则</h3>
+        <p style="font-size:12px;color:#8b949e;margin-bottom:12px">模式会先作为<strong>正则</strong>（fullmatch）尝试，失败后回退到 <strong>fnmatch 通配符</strong>。在目标中使用 <code>$1</code> <code>$2</code> ... 引用正则捕获组。</p>
         <table class="rules-table">
           <thead>
             <tr>
-              <th>Type</th>
-              <th>Pattern</th>
-              <th>Meaning</th>
+              <th>类型</th>
+              <th>模式</th>
+              <th>含义</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Regex</td><td><code>(.+)-(\d+\.\d+)</code></td><td>Capture name and version into $1 and $2</td></tr>
-            <tr><td>Regex</td><td><code>glm-(.+)</code></td><td>Capture suffix after "glm-" into $1</td></tr>
-            <tr><td>Regex</td><td><code>(.*)</code></td><td>Match everything, capture into $1</td></tr>
-            <tr><td>Wildcard</td><td><code>*</code></td><td>Match any number of characters</td></tr>
-            <tr><td>Wildcard</td><td><code>?</code></td><td>Match exactly one character</td></tr>
-            <tr><td>Wildcard</td><td><code>[seq]</code></td><td>Match any character in <code>seq</code></td></tr>
-            <tr><td>Wildcard</td><td><code>[!seq]</code></td><td>Match any character not in <code>seq</code></td></tr>
+            <tr><td>正则</td><td><code>(.+)-(\d+\.\d+)</code></td><td>将名称和版本捕获到 $1 和 $2</td></tr>
+            <tr><td>正则</td><td><code>glm-(.+)</code></td><td>将“glm-”之后的后缀捕获到 $1</td></tr>
+            <tr><td>正则</td><td><code>(.*)</code></td><td>匹配所有内容并捕获到 $1</td></tr>
+            <tr><td>通配符</td><td><code>*</code></td><td>匹配任意数量的字符</td></tr>
+            <tr><td>通配符</td><td><code>?</code></td><td>精确匹配一个字符</td></tr>
+            <tr><td>通配符</td><td><code>[seq]</code></td><td>匹配 <code>seq</code> 中的任意字符</td></tr>
+            <tr><td>通配符</td><td><code>[!seq]</code></td><td>匹配不在 <code>seq</code> 中的任意字符</td></tr>
           </tbody>
         </table>
-        <h3 style="margin-top:16px">Examples</h3>
+        <h3 style="margin-top:16px">示例</h3>
         <table class="rules-table">
           <thead>
             <tr>
-              <th>Pattern</th>
-              <th>Target</th>
-              <th>Input Model</th>
-              <th>Result</th>
+              <th>模式</th>
+              <th>目标</th>
+              <th>输入模型</th>
+              <th>结果</th>
             </tr>
           </thead>
           <tbody>
@@ -437,10 +437,10 @@
             <tr><td><code>glm-(.+)</code></td><td><code>glm-$1</code></td><td><code>glm-5.4</code></td><td class="match-yes">glm-5.4</td></tr>
             <tr><td><code>(.+)-flash</code></td><td><code>$1-4o</code></td><td><code>gpt-flash</code></td><td class="match-yes">gpt-4o</td></tr>
             <tr><td><code>gpt-4*</code></td><td><code>gpt-4o</code></td><td><code>gpt-4o-mini</code></td><td class="match-yes">gpt-4o</td></tr>
-            <tr><td><code>gpt-4*</code></td><td><code>gpt-4o</code></td><td><code>claude-3</code></td><td class="match-no">No match</td></tr>
+            <tr><td><code>gpt-4*</code></td><td><code>gpt-4o</code></td><td><code>claude-3</code></td><td class="match-no">不匹配</td></tr>
           </tbody>
         </table>
-        <div class="rules-note">Matching is case-sensitive. Regex patterns are tried first (fullmatch); if they fail or are invalid, fnmatch wildcard matching is used. Rules are matched in order; the first match wins. Unmatched model names are forwarded unchanged.</div>
+        <div class="rules-note">匹配区分大小写。优先尝试正则模式（fullmatch）；若失败或无效，则使用 fnmatch 通配符匹配。规则按顺序匹配，先匹配者生效。未匹配的模型名将原样转发。</div>
       </div>
     </div>
   </div>
@@ -449,8 +449,8 @@
     <div class="confirm-box">
       <p id="confirm-message"></p>
       <div class="confirm-actions">
-        <button class="btn" onclick="confirmCancel()">Cancel</button>
-        <button class="btn btn-danger" onclick="confirmOk()">Delete</button>
+        <button class="btn" onclick="confirmCancel()">取消</button>
+        <button class="btn btn-danger" onclick="confirmOk()">删除</button>
       </div>
     </div>
   </div>
@@ -500,15 +500,15 @@
     PROVIDERS.forEach(name => { PROVIDER_MAP[name] = name; });
 
     function renderRow(m, idx) {
-      const provDisplay = m.provider ? esc(m.provider) : '<span style="color:#484f58">Default</span>';
+      const provDisplay = m.provider ? esc(m.provider) : '<span style="color:#484f58">默认</span>';
       return `<tr data-idx="${idx}">
         <td class="pattern-cell">${esc(m.pattern)}</td>
         <td><span style="color:#58a6ff;font-size:16px">&rarr;</span></td>
         <td class="target-cell">${esc(m.target)}</td>
         <td>${provDisplay}</td>
         <td style="white-space:nowrap" class="col-actions">
-          <button class="btn btn-sm" data-action="edit" data-idx="${idx}">Edit</button>
-          <button class="btn btn-sm btn-danger" data-action="delete" data-idx="${idx}">Delete</button>
+          <button class="btn btn-sm" data-action="edit" data-idx="${idx}">编辑</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-idx="${idx}">删除</button>
         </td>
       </tr>`;
     }
@@ -522,18 +522,18 @@
           doLogout();
           return;
         }
-        toast(result.data.error || 'Failed to load mappings');
+        toast(result.data.error || '加载映射失败');
         return;
       }
       const mappings = result.data.mappings || [];
       cachedMappings = mappings;
       const tbody = document.getElementById('mapping-tbody');
       if (mappings.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">No mapping rules. Models will be forwarded unchanged.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">暂无映射规则。模型将原样转发。</td></tr>';
       } else {
         tbody.innerHTML = mappings.map((m, i) => renderRow(m, i)).join('');
       }
-      document.getElementById('mapping-count').textContent = `${mappings.length} rule(s)`;
+      document.getElementById('mapping-count').textContent = `${mappings.length} 条规则`;
     }
 
     async function addMapping() {
@@ -541,12 +541,12 @@
       const target = document.getElementById('add-target').value.trim();
       const provider = document.getElementById('add-provider').value;
       if (!pattern || !target) {
-        toast('Pattern and target are required');
+        toast('模式和目标为必填项');
         return;
       }
       const result = await api('POST', '/mapping/api', { pattern, target, provider });
       if (!result.ok) {
-        toast(result.data.error || 'Failed to save mapping');
+        toast(result.data.error || '保存映射失败');
         return;
       }
       if (editingPattern && editingPattern !== pattern) {
@@ -557,7 +557,7 @@
       document.getElementById('add-target').value = '';
       document.getElementById('add-provider').value = '';
       await loadMappings();
-      toast(editingPattern ? 'Mapping updated' : 'Mapping added', 'success');
+      toast(editingPattern ? '映射已更新' : '映射已添加', 'success');
       editingPattern = null;
     }
 
@@ -566,7 +566,7 @@
       document.getElementById('add-pattern').value = pattern;
       document.getElementById('add-target').value = target;
       document.getElementById('add-provider').value = provider || '';
-      document.getElementById('add-btn').textContent = 'Save';
+      document.getElementById('add-btn').textContent = '保存';
       document.getElementById('cancel-btn').style.display = '';
       document.getElementById('add-pattern').focus();
     }
@@ -576,7 +576,7 @@
       document.getElementById('add-pattern').value = '';
       document.getElementById('add-target').value = '';
       document.getElementById('add-provider').value = '';
-      document.getElementById('add-btn').textContent = 'Add';
+      document.getElementById('add-btn').textContent = '添加';
       document.getElementById('cancel-btn').style.display = 'none';
     }
 
@@ -597,15 +597,15 @@
     }
 
     async function confirmDelete(pattern) {
-      const ok = await showConfirm('Delete mapping: ' + pattern + ' ?');
+      const ok = await showConfirm('删除映射：' + pattern + ' ？');
       if (!ok) return;
       const result = await api('DELETE', '/mapping/api', { pattern });
       if (!result.ok) {
-        toast(result.data.error || 'Failed to delete mapping');
+        toast(result.data.error || '删除映射失败');
         return;
       }
       await loadMappings();
-      toast('Mapping deleted', 'success');
+      toast('映射已删除', 'success');
     }
 
     document.getElementById('add-pattern').addEventListener('keydown', e => {
@@ -634,7 +634,7 @@
     async function doLogin() {
       const token = document.getElementById('login-token').value.trim();
       if (!token) {
-        document.getElementById('login-error').textContent = 'Please enter your proxy token';
+        document.getElementById('login-error').textContent = '请输入你的 proxy token';
         return;
       }
       document.getElementById('login-error').textContent = '';
@@ -643,15 +643,15 @@
           headers: { 'X-Proxy-Token': token },
         });
         if (resp.status === 401) {
-          document.getElementById('login-error').textContent = 'Token is required';
+          document.getElementById('login-error').textContent = '需要提供 token';
           return;
         }
         if (resp.status === 403) {
-          document.getElementById('login-error').textContent = 'Invalid or disabled token';
+          document.getElementById('login-error').textContent = 'token 无效或已禁用';
           return;
         }
         if (!resp.ok) {
-          document.getElementById('login-error').textContent = 'Login failed';
+          document.getElementById('login-error').textContent = '登录失败';
           return;
         }
         proxyToken = token;
@@ -659,10 +659,10 @@
         document.getElementById('login-overlay').classList.add('hidden');
         document.getElementById('mapping-content').classList.add('active');
         const shortToken = token.length > 16 ? token.slice(0, 8) + '...' + token.slice(-6) : token;
-        document.getElementById('token-info').textContent = 'Token: ' + shortToken;
+        document.getElementById('token-info').textContent = 'Token：' + shortToken;
         loadMappings();
       } catch (e) {
-        document.getElementById('login-error').textContent = 'Network error';
+        document.getElementById('login-error').textContent = '网络错误';
       }
     }
 

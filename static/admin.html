@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Token Management</title>
+  <title>Token 管理</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .table-wrap {
       overflow-x: auto;
@@ -611,13 +611,13 @@
 
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Admin Login</h2>
+      <h2>管理员登录</h2>
       <div class="form-group">
-        <label>Admin Token</label>
-        <input type="text" id="login-token" placeholder="enter admin token..." autofocus>
+        <label>管理员 Token</label>
+        <input type="text" id="login-token" placeholder="请输入管理员 Token…" autofocus>
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">登录</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
@@ -627,16 +627,16 @@
     <script>
       OneGateHeader.mount('#og-header', {
         active: 'admin',
-        title: 'Token Management',
-        actions: '<div class="info" id="stats"></div><a class="btn btn-sm" href="/models">Model Catalog</a><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+        title: 'Token 管理',
+        actions: '<div class="info" id="stats"></div><a class="btn btn-sm" href="/models">模型目录</a><button class="btn btn-sm" onclick="doLogout()">退出登录</button>'
       });
     </script>
     <div class="container">
       <div class="toolbar">
         <h2 id="token-count"></h2>
         <div style="display:flex;gap:8px">
-          <button class="btn" onclick="loadTokens()">Refresh</button>
-          <button class="btn btn-primary" onclick="showCreateModal()">+ New Token</button>
+          <button class="btn" onclick="loadTokens()">刷新</button>
+          <button class="btn btn-primary" onclick="showCreateModal()">+ 新建 Token</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -644,18 +644,18 @@
         <thead>
           <tr>
             <th>Token</th>
-            <th>Describe</th>
-            <th>Providers</th>
-            <th>Models</th>
-            <th>Admin</th>
-            <th>Enabled</th>
-            <th>Rate Limits</th>
+            <th>描述</th>
+            <th>提供商</th>
+            <th>模型</th>
+            <th>管理员</th>
+            <th>已启用</th>
+            <th>速率限制</th>
             <th>5h</th>
             <th>1d</th>
             <th>7d</th>
-            <th>Created</th>
-            <th>Top Tool</th>
-            <th class="col-actions">Actions</th>
+            <th>创建时间</th>
+            <th>常用工具</th>
+            <th class="col-actions">操作</th>
           </tr>
         </thead>
         <tbody id="token-tbody"></tbody>
@@ -665,34 +665,34 @@
 
     <div class="modal-overlay" id="modal-overlay">
       <div class="modal">
-        <h3 id="modal-title">New Token</h3>
+        <h3 id="modal-title">新建 Token</h3>
         <div class="form-group">
-          <label>Token (leave empty to auto-generate)</label>
-          <input type="text" id="modal-token" placeholder="auto-generated">
+          <label>Token（留空自动生成）</label>
+          <input type="text" id="modal-token" placeholder="自动生成">
         </div>
         <div class="form-group">
-          <label>Describe</label>
-          <input type="text" id="modal-describe" placeholder="describe the token usage..." style="font-family:var(--font-all)">
+          <label>描述</label>
+          <input type="text" id="modal-describe" placeholder="描述该 Token 的用途..." style="font-family:var(--font-all)">
         </div>
         <div class="form-group">
-          <label>Providers</label>
+          <label>提供商</label>
           <div class="checkbox-group" id="modal-providers"></div>
         </div>
         <div class="form-group">
-          <label>Visible models</label>
+          <label>可见模型</label>
           <div class="checkbox-group scroll" id="modal-models"></div>
-          <div class="form-hint" id="modal-models-hint">Checked ids are the only ones this token sees in /v1/models. * (all models) exposes the whole catalog.</div>
+          <div class="form-hint" id="modal-models-hint">勾选的 id 是该 Token 在 /v1/models 中唯一可见的模型。*（全部模型）会暴露整个目录。</div>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:10px">
-          <label style="margin:0;text-transform:none;font-size:13px;color:#c9d1d9">Admin</label>
+          <label style="margin:0;text-transform:none;font-size:13px;color:#c9d1d9">管理员</label>
           <label class="toggle">
             <input type="checkbox" id="modal-admin">
             <span class="slider"></span>
           </label>
         </div>
         <div class="form-group" style="margin-top:8px">
-          <label>Rate Limits (-1 = unlimited, 0 = not allowed; token limits in M)</label>
-          <div style="font-size:11px;color:#8b949e;margin-top:6px;margin-bottom:2px">Requests</div>
+          <label>速率限制（-1 = 不限制，0 = 不允许；token 限额单位为 M）</label>
+          <div style="font-size:11px;color:#8b949e;margin-top:6px;margin-bottom:2px">请求</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
             <div><label class="rl-label">RPM</label><input type="number" id="modal-rpm" value="-1" class="rl-input"></div>
             <div><label class="rl-label">RPH</label><input type="number" id="modal-rph" value="-1" class="rl-input"></div>
@@ -701,7 +701,7 @@
             <div><label class="rl-label">RP月</label><input type="number" id="modal-rpmo" value="-1" class="rl-input"></div>
             <div><label class="rl-label">RPT</label><input type="number" id="modal-rpt" value="-1" class="rl-input"></div>
           </div>
-          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">Tokens (M)</div>
+          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">Token（M）</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
             <div><label class="rl-label">TPM</label><input type="number" step="any" id="modal-tpm" value="-1" class="rl-input"></div>
             <div><label class="rl-label">TPH</label><input type="number" step="any" id="modal-tph" value="-1" class="rl-input"></div>
@@ -710,15 +710,15 @@
             <div><label class="rl-label">TP月</label><input type="number" step="any" id="modal-tpmo" value="-1" class="rl-input"></div>
             <div><label class="rl-label">TPT</label><input type="number" step="any" id="modal-tpt" value="-1" class="rl-input"></div>
           </div>
-          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">Cache token weights (-1 = inherit global)</div>
+          <div style="font-size:11px;color:#8b949e;margin-top:8px;margin-bottom:2px">缓存 token 权重（-1 = 继承全局）</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div><label class="rl-label">cache_read</label><input type="number" step="any" id="modal-cache_read_weight" value="-1" class="rl-input"></div>
             <div><label class="rl-label">cache_write</label><input type="number" step="any" id="modal-cache_write_weight" value="-1" class="rl-input"></div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn" onclick="hideModal()">Cancel</button>
-          <button class="btn btn-primary" id="modal-submit" onclick="submitModal()">Create</button>
+          <button class="btn" onclick="hideModal()">取消</button>
+          <button class="btn btn-primary" id="modal-submit" onclick="submitModal()">创建</button>
         </div>
       </div>
     </div>
@@ -727,8 +727,8 @@
       <div class="confirm-box">
         <p id="confirm-message"></p>
         <div class="confirm-actions">
-          <button class="btn" onclick="confirmCancel()">Cancel</button>
-          <button class="btn btn-danger" id="confirm-ok" onclick="confirmOk()">Delete</button>
+          <button class="btn" onclick="confirmCancel()">取消</button>
+          <button class="btn btn-danger" id="confirm-ok" onclick="confirmOk()">删除</button>
         </div>
       </div>
     </div>
@@ -785,7 +785,7 @@
 
     function copyToken(token) {
       if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(token).then(() => toast('Token copied', 'success')).catch(() => fallbackCopy(token));
+        navigator.clipboard.writeText(token).then(() => toast('Token 已复制', 'success')).catch(() => fallbackCopy(token));
       } else {
         fallbackCopy(token);
       }
@@ -798,8 +798,8 @@
       ta.style.left = '-9999px';
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand('copy'); toast('Token copied', 'success'); }
-      catch (e) { toast('Copy failed', 'error'); }
+      try { document.execCommand('copy'); toast('Token 已复制', 'success'); }
+      catch (e) { toast('复制失败', 'error'); }
       document.body.removeChild(ta);
     }
 
@@ -872,9 +872,9 @@
     })();
 
     function renderProviders(provs) {
-      if (provs.includes('*')) return '<span class="tag tag-all">All</span>';
+      if (provs.includes('*')) return '<span class="tag tag-all">全部</span>';
       const tip = provs.map(p => `<div>${esc(p)}</div>`).join('');
-      return `<span class="tag" data-tip="${escAttr('<div class="ut-title">Providers</div>' + tip)}">${provs.length}</span>`;
+      return `<span class="tag" data-tip="${escAttr('<div class="ut-title">提供商</div>' + tip)}">${provs.length}</span>`;
     }
 
     const RL_FIELDS = [
@@ -899,18 +899,18 @@
       for (const key of WEIGHT_FIELDS) {
         const v = t[key];
         if (v === undefined || v === null || v === -1) continue;
-        const label = key === 'cache_read_weight' ? 'cache_read w' : 'cache_write w';
+        const label = key === 'cache_read_weight' ? 'cache_read 权重' : 'cache_write 权重';
         rows.push(`<tr><td style="color:#8b949e;padding:2px 14px 2px 0">${label}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${v}</td></tr>`);
       }
-      if (!rows.length) return '<div class="ut-title">Rate Limits</div><div style="color:#8b949e">Unlimited</div>';
-      return '<div class="ut-title">Rate Limits</div><table>' + rows.join('') + '</table>';
+      if (!rows.length) return '<div class="ut-title">速率限制</div><div style="color:#8b949e">不限制</div>';
+      return '<div class="ut-title">速率限制</div><table>' + rows.join('') + '</table>';
     }
 
     function renderRateLimits(t) {
       let n = 0;
       for (const [key] of RL_FIELDS) if (t[key] !== undefined && t[key] !== null && t[key] !== -1) n++;
       for (const key of WEIGHT_FIELDS) if (t[key] !== undefined && t[key] !== null && t[key] !== -1) n++;
-      if (!n) return '<span style="color:#8b949e;font-size:11px">Unlimited</span>';
+      if (!n) return '<span style="color:#8b949e;font-size:11px">不限制</span>';
       return `<span class="rl-pill">⚙ ${n}</span>`;
     }
 
@@ -1001,12 +1001,12 @@
 
     function usageTooltip(windowData) {
       if (!windowData || !windowData.tokens) {
-        return '<div class="ut-empty">No token usage data</div>';
+        return '<div class="ut-empty">暂无 token 用量数据</div>';
       }
       const tokens = windowData.tokens || {};
       const providers = Object.keys(tokens);
       if (providers.length === 0) {
-        return '<div class="ut-empty">No token usage data</div>';
+        return '<div class="ut-empty">暂无 token 用量数据</div>';
       }
       const cell = (v, dotCls, valCls) => '<td class="' + (valCls || '') + '">' + fmtNum(v) + '</td>';
       let totIn = 0, totOut = 0, totCR = 0, totCW = 0;
@@ -1024,7 +1024,7 @@
           + '</tr>';
       });
       rows.push('<tr class="ut-total">'
-        + '<td class="ut-prov">Total</td>'
+        + '<td class="ut-prov">总计</td>'
         + cell(totIn, 'dot-in', 'ut-in')
         + cell(totOut, 'dot-out', 'ut-out')
         + cell(totCR, 'dot-cr', 'ut-cr')
@@ -1032,14 +1032,14 @@
         + hitRateCell(totCR, totIn)
         + '</tr>');
       const head = '<thead><tr>'
-        + '<th>Provider</th>'
-        + '<th>In</th>'
-        + '<th>Out</th>'
+        + '<th>提供商</th>'
+        + '<th>输入</th>'
+        + '<th>输出</th>'
         + '<th>CR</th>'
         + '<th>CW</th>'
         + '<th>命中率</th>'
         + '</tr></thead>';
-      return '<div class="ut-title">Token Usage</div><table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
+      return '<div class="ut-title">Token 用量</div><table>' + head + '<tbody>' + rows.join('') + '</tbody></table>';
     }
 
     const _adminClientLabels = {
@@ -1050,7 +1050,7 @@
       'kilo': 'Kilo', 'kilo-code': 'Kilo Code', 'qwen-code': 'Qwen Code',
       'crush': 'Crush', 'goose': 'Goose', 'serena': 'Serena',
       'python-openai': 'OpenAI SDK (Python)', 'node-openai': 'OpenAI SDK (Node)',
-      'unknown': 'Unknown'
+      'unknown': '未知'
     };
     function topClientLabel(u) {
       if (!u || !u.top_client) return '-';
@@ -1058,12 +1058,12 @@
       return (_adminClientLabels[c.client] || c.client) + ' (' + (c.requests || 0) + ')';
     }
     function topClientTooltip(u) {
-      if (!u || !u.clients || u.clients.length === 0) return 'No client data (last 30d)';
+      if (!u || !u.clients || u.clients.length === 0) return '暂无客户端数据（最近 30 天）';
       return u.clients.map(c => (_adminClientLabels[c.client] || c.client) + ': ' + (c.requests || 0)).join('\n');
     }
 
     function renderRow(t, usageMap) {
-      const adminBadge = t.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-user">User</span>';
+      const adminBadge = t.is_admin ? '<span class="badge badge-admin">管理员</span>' : '<span class="badge badge-user">用户</span>';
       const shortToken = t.token.slice(0, 6);
       const u = usageMap[t.token] || {};
       const tokenNums = (wd) => {
@@ -1089,9 +1089,9 @@
     <td style="font-size:12px;color:#8b949e">${fmtDate(t.created_at)}</td>
     <td style="font-size:11px;color:${u.top_client && u.top_client.client !== 'unknown' ? '#79c0ff' : '#8b949e'}" title="${esc(topClientTooltip(u))}">${esc(topClientLabel(u))}</td>
     <td class="col-actions">
-      <button class="btn btn-sm" onclick="showEditModal('${esc(t.token)}')">Edit</button>
-      <button class="btn btn-sm" onclick="openUsage('${esc(t.token)}')">Usage</button>
-      <button class="btn btn-sm btn-danger" onclick="confirmDelete('${esc(t.token)}')">Delete</button>
+      <button class="btn btn-sm" onclick="showEditModal('${esc(t.token)}')">编辑</button>
+      <button class="btn btn-sm" onclick="openUsage('${esc(t.token)}')">用量</button>
+      <button class="btn btn-sm btn-danger" onclick="confirmDelete('${esc(t.token)}')">删除</button>
     </td>
   </tr>`;
     }
@@ -1102,20 +1102,20 @@
         api('GET', '/admin/api/tokens/usage'),
       ]);
       if (!tokensRes.ok) {
-        toast(tokensRes.data.error || 'Failed to load tokens');
+        toast(tokensRes.data.error || '加载 Token 失败');
         return;
       }
       const usageMap = usageRes.ok ? (usageRes.data.usage || {}) : {};
       const tbody = document.getElementById('token-tbody');
       if (!tokensRes.data.tokens || tokensRes.data.tokens.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="empty">No tokens</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="empty">暂无 Token</td></tr>';
       } else {
         tbody.innerHTML = tokensRes.data.tokens.map(t => renderRow(t, usageMap)).join('');
       }
       const total = tokensRes.data.tokens ? tokensRes.data.tokens.length : 0;
       const admins = tokensRes.data.tokens ? tokensRes.data.tokens.filter(t => t.is_admin).length : 0;
-      document.getElementById('token-count').textContent = `${total} token(s)`;
-      document.getElementById('stats').textContent = `${admins} admin(s) / ${total} total`;
+      document.getElementById('token-count').textContent = `共 ${total} 个 Token`;
+      document.getElementById('stats').textContent = `${admins} 个管理员 / 共 ${total} 个`;
     }
 
     function buildProviderCheckboxes(containerId, selected) {
@@ -1123,7 +1123,7 @@
       const allOpts = ['*', ...PROVIDERS];
       c.innerHTML = allOpts.map(p => {
         const checked = selected.includes(p) ? 'checked' : '';
-        return `<label><input type="checkbox" value="${esc(p)}" ${checked}>${esc(p === '*' ? '* (all)' : p)}</label>`;
+        return `<label><input type="checkbox" value="${esc(p)}" ${checked}>${esc(p === '*' ? '*（全部）' : p)}</label>`;
       }).join('');
     }
 
@@ -1155,14 +1155,14 @@
       }
       c.innerHTML = ids.map(id => {
         const checked = hasAll ? id === '*' : chosen.includes(id);
-        const label = id === '*' ? '* (all models)' : id;
+        const label = id === '*' ? '*（全部模型）' : id;
         return `<label><input type="checkbox" value="${escAttr(id)}" ${checked ? 'checked' : ''}>${esc(label)}</label>`;
       }).join('');
       const hint = document.getElementById(containerId + '-hint');
       if (hint) {
         hint.textContent = (catalogModels && catalogModels.length)
-          ? 'Checked ids are the only ones this token sees in /v1/models. * (all models) exposes the whole catalog.'
-          : 'The model catalog is empty. Add models in Model Catalog first.';
+          ? '勾选的 id 是该 Token 在 /v1/models 中唯一可见的模型。*（全部模型）会暴露整个目录。'
+          : '模型目录为空，请先在模型目录中添加模型。';
       }
     }
 
@@ -1174,8 +1174,8 @@
 
     function renderModels(models) {
       const list = Array.isArray(models) ? models : [];
-      if (list.includes('*')) return '<span class="tag tag-all">* (all)</span>';
-      if (list.length === 0) return '<span style="color:#8b949e;font-size:11px">None</span>';
+      if (list.includes('*')) return '<span class="tag tag-all">*（全部）</span>';
+      if (list.length === 0) return '<span style="color:#8b949e;font-size:11px">无</span>';
       const text = list.join(', ');
       return `<span class="models-cell" title="${escAttr(text)}">${esc(text)}</span>`;
     }
@@ -1183,7 +1183,7 @@
     async function showCreateModal() {
       await ensureCatalog();
       editingToken = null;
-      document.getElementById('modal-title').textContent = 'New Token';
+      document.getElementById('modal-title').textContent = '新建 Token';
       document.getElementById('modal-token').value = '';
       document.getElementById('modal-token').disabled = false;
       document.getElementById('modal-describe').value = '';
@@ -1191,21 +1191,21 @@
       buildProviderCheckboxes('modal-providers', ['*']);
       buildModelCheckboxes('modal-models', ['*']);
       resetLimitInputs();
-      document.getElementById('modal-submit').textContent = 'Create';
+      document.getElementById('modal-submit').textContent = '创建';
       document.getElementById('modal-overlay').classList.add('active');
     }
 
     async function showEditModal(token) {
       const { ok, data } = await api('GET', '/admin/api/tokens');
       if (!ok) {
-        toast(data.error || 'Failed to load tokens');
+        toast(data.error || '加载 Token 失败');
         return;
       }
       const t = data.tokens ? data.tokens.find(x => x.token === token) : null;
       if (!t) return;
       await ensureCatalog();
       editingToken = token;
-      document.getElementById('modal-title').textContent = 'Edit Token';
+      document.getElementById('modal-title').textContent = '编辑 Token';
       document.getElementById('modal-token').value = token;
       document.getElementById('modal-token').disabled = false;
       document.getElementById('modal-describe').value = t.describe || '';
@@ -1213,7 +1213,7 @@
       buildProviderCheckboxes('modal-providers', t.providers);
       buildModelCheckboxes('modal-models', Array.isArray(t.models) ? t.models : ['*']);
       populateLimitInputs(t);
-      document.getElementById('modal-submit').textContent = 'Save';
+      document.getElementById('modal-submit').textContent = '保存';
       document.getElementById('modal-overlay').classList.add('active');
     }
 
@@ -1228,7 +1228,7 @@
       const describe = document.getElementById('modal-describe').value.trim();
       const limits = readLimitInputs();
       if (!models.length) {
-        toast('Select at least one visible model');
+        toast('请至少选择一个可见模型');
         return;
       }
       let result;
@@ -1255,11 +1255,10 @@
         });
       }
       if (!result.ok) {
-        toast(result.data.error || 'Operation failed');
+        toast(result.data.error || '操作失败');
         return;
       }
-      // If the edited token was renamed, keep the session valid when an admin
-      // renames their own token.
+      // 若被编辑的 token 已重命名，管理员重命名自己的 token 时保持会话有效。
       if (editingToken && result.data && result.data.token && result.data.token.token !== editingToken) {
         if (editingToken === adminToken) {
           adminToken = result.data.token.token;
@@ -1270,7 +1269,7 @@
       }
       hideModal();
       await loadTokens();
-      toast(editingToken ? 'Token updated' : 'Token created', 'success');
+      toast(editingToken ? 'Token 已更新' : 'Token 已创建', 'success');
     }
 
     async function toggleEnabled(checkbox, token) {
@@ -1280,7 +1279,7 @@
         enabled: newVal,
       });
       if (!result.ok) {
-        toast(result.data.error || 'Failed to update');
+        toast(result.data.error || '更新失败');
         checkbox.checked = !newVal;
         return;
       }
@@ -1306,7 +1305,7 @@
     }
 
     async function confirmDelete(token) {
-      const ok = await showConfirm('Delete token ' + token.slice(0, 20) + '...?');
+      const ok = await showConfirm('删除 Token ' + token.slice(0, 20) + '…？');
       if (ok) {
         await deleteToken(token);
       }
@@ -1322,11 +1321,11 @@
     async function deleteToken(token) {
       const result = await api('DELETE', '/admin/api/tokens', { token });
       if (!result.ok) {
-        toast(result.data.error || 'Failed to delete');
+        toast(result.data.error || '删除失败');
         return;
       }
       await loadTokens();
-      toast('Token deleted', 'success');
+      toast('Token 已删除', 'success');
     }
 
     document.getElementById('modal-models').addEventListener('change', function (e) {
@@ -1349,7 +1348,7 @@
     async function doLogin() {
       const token = document.getElementById('login-token').value.trim();
       if (!token) {
-        document.getElementById('login-error').textContent = 'Please enter a token';
+        document.getElementById('login-error').textContent = '请输入管理员 Token';
         return;
       }
       document.getElementById('login-error').textContent = '';
@@ -1358,11 +1357,11 @@
           headers: { 'X-Admin-Token': token },
         });
         if (resp.status === 403) {
-          document.getElementById('login-error').textContent = 'Invalid admin token';
+          document.getElementById('login-error').textContent = '管理员 Token 无效';
           return;
         }
         if (!resp.ok) {
-          document.getElementById('login-error').textContent = 'Login failed';
+          document.getElementById('login-error').textContent = '登录失败';
           return;
         }
         adminToken = token;
@@ -1372,7 +1371,7 @@
         await ensureCatalog();
         loadTokens();
       } catch (e) {
-        document.getElementById('login-error').textContent = 'Network error';
+        document.getElementById('login-error').textContent = '网络错误';
       }
     }
 

@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Model Pricing</title>
+  <title>模型定价</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .container { max-width: 1000px }
 
@@ -235,8 +235,8 @@
   <script>
     OneGateHeader.mount('#og-header', {
       active: 'pricing',
-      title: 'Model Pricing',
-      actions: '<span class="badge" id="role-badge">View only</span><button class="btn btn-sm" id="login-btn" onclick="showLogin()">Login as admin</button><button class="btn btn-sm" id="logout-btn" style="display:none" onclick="doLogout()">Logout</button>'
+      title: '模型定价',
+      actions: '<span class="badge" id="role-badge">仅查看</span><button class="btn btn-sm" id="login-btn" onclick="showLogin()">管理员登录</button><button class="btn btn-sm" id="logout-btn" style="display:none" onclick="doLogout()">退出登录</button>'
     });
   </script>
 
@@ -244,38 +244,38 @@
 
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Admin Login</h2>
+      <h2>管理员登录</h2>
       <div class="form-group">
-        <label>Admin Token</label>
-        <input type="text" id="login-token" placeholder="enter admin token to edit...">
+        <label>管理员 Token</label>
+        <input type="text" id="login-token" placeholder="请输入管理员 Token…">
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">Login</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">登录</button>
       <div class="error-msg" id="login-error"></div>
-      <div class="login-hint">Without login you can still <a href="#" onclick="loadReadOnly();return false" style="color:#58a6ff">view pricing read-only</a>.</div>
+      <div class="login-hint">未登录也可以<a href="#" onclick="loadReadOnly();return false" style="color:#58a6ff">以只读方式查看定价</a>。</div>
     </div>
   </div>
 
   <div class="container">
     <div class="toolbar">
       <div>
-        <h2 id="pricing-count">Pricing</h2>
-        <div class="unit-hint">All prices in 元 / million tokens</div>
+        <h2 id="pricing-count">定价</h2>
+        <div class="unit-hint">所有价格单位为 元 / 百万 token</div>
       </div>
       <div id="add-wrap" style="display:none">
-        <button class="btn btn-primary" onclick="addRow()">+ Add Model</button>
+        <button class="btn btn-primary" onclick="addRow()">+ 添加模型</button>
       </div>
     </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Model</th>
+            <th>模型</th>
             <th>输入 (缓存命中)</th>
             <th>输入 (缓存未命中)</th>
             <th>输出 (缓存命中)</th>
             <th>输出 (缓存未命中)</th>
-            <th class="actions">Actions</th>
+            <th class="actions">操作</th>
           </tr>
         </thead>
         <tbody id="pricing-body"></tbody>
@@ -318,7 +318,7 @@
 
     async function loadPricing() {
       const { ok, data } = await api('GET', '/pricing/api');
-      if (!ok) { toast(data.error || 'Failed to load'); return; }
+      if (!ok) { toast(data.error || '加载失败'); return; }
       isAdmin = !!data.is_admin;
       pricingData = data.pricing || [];
       renderRole();
@@ -336,19 +336,19 @@
       const logoutBtn = document.getElementById('logout-btn');
       const addWrap = document.getElementById('add-wrap');
       if (isAdmin) {
-        badge.textContent = 'Admin';
+        badge.textContent = '管理员';
         badge.classList.add('admin');
         loginBtn.style.display = 'none';
         logoutBtn.style.display = '';
         addWrap.style.display = '';
       } else {
-        badge.textContent = 'View only';
+        badge.textContent = '仅查看';
         badge.classList.remove('admin');
         loginBtn.style.display = '';
         logoutBtn.style.display = 'none';
         addWrap.style.display = 'none';
       }
-      document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+      document.getElementById('pricing-count').textContent = pricingData.length + ' 个模型已定价';
     }
 
     function fmtPrice(v) {
@@ -369,8 +369,8 @@
             <td><input class="price-input" data-field="output_cache_hit" type="number" step="any" min="0" value="${fmtPrice(p.output_cache_hit)}"></td>
             <td><input class="price-input" data-field="output_cache_miss" type="number" step="any" min="0" value="${fmtPrice(p.output_cache_miss)}"></td>
             <td class="actions">
-              <button class="btn btn-sm btn-primary" onclick="saveRow(${i})">Save</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteRow(${i})">Delete</button>
+              <button class="btn btn-sm btn-primary" onclick="saveRow(${i})">保存</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteRow(${i})">删除</button>
             </td>
           </tr>`;
         }
@@ -402,7 +402,7 @@
         const inp = last.querySelector('.model-input');
         if (inp) inp.focus();
       }
-      document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+      document.getElementById('pricing-count').textContent = pricingData.length + ' 个模型已定价';
     }
 
     function readRow(i) {
@@ -421,13 +421,13 @@
     async function saveRow(i) {
       const row = readRow(i);
       if (!row) return;
-      if (!row.model) { toast('Model is required'); return; }
+      if (!row.model) { toast('模型为必填项'); return; }
       for (const k of ['input_cache_hit', 'input_cache_miss', 'output_cache_hit', 'output_cache_miss']) {
-        if (!isFinite(row[k]) || row[k] < 0) { toast('Prices must be non-negative numbers'); return; }
+        if (!isFinite(row[k]) || row[k] < 0) { toast('价格必须为非负数'); return; }
       }
       const { ok, data } = await api('POST', '/pricing/api', row);
-      if (!ok) { toast(data.error || 'Save failed'); return; }
-      toast('Saved', 'success');
+      if (!ok) { toast(data.error || '保存失败'); return; }
+      toast('已保存', 'success');
       await loadPricing();
     }
 
@@ -436,12 +436,12 @@
       if (!model) {
         pricingData.splice(i, 1);
         render();
-        document.getElementById('pricing-count').textContent = pricingData.length + ' model(s) priced';
+        document.getElementById('pricing-count').textContent = pricingData.length + ' 个模型已定价';
         return;
       }
       const { ok, data } = await api('DELETE', '/pricing/api', { model });
-      if (!ok) { toast(data.error || 'Delete failed'); return; }
-      toast('Deleted', 'success');
+      if (!ok) { toast(data.error || '删除失败'); return; }
+      toast('已删除', 'success');
       await loadPricing();
     }
 
@@ -457,13 +457,13 @@
 
     async function doLogin() {
       const token = document.getElementById('login-token').value.trim();
-      if (!token) { document.getElementById('login-error').textContent = 'Please enter a token'; return; }
+      if (!token) { document.getElementById('login-error').textContent = '请输入 token'; return; }
       document.getElementById('login-error').textContent = '';
       adminToken = token;
       const { ok, data } = await api('GET', '/pricing/api');
       if (!ok || !data.is_admin) {
         adminToken = null;
-        document.getElementById('login-error').textContent = 'Invalid or non-admin token';
+        document.getElementById('login-error').textContent = 'Token 无效或不是管理员 Token';
         return;
       }
       if (document.getElementById('login-remember').checked) {

@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Service Status</title>
+  <title>服务状态</title>
   <link rel="stylesheet" href="/static/common.css?v=6">
-  <script src="/static/header.js?v=1"></script>
+  <script src="/static/header.js?v=2"></script>
   <style>
     .provider-name {
       font-size: 16px;
@@ -348,14 +348,14 @@
 <body>
   <div class="login-overlay" id="login-overlay">
     <div class="login-box">
-      <h2>Service Status</h2>
-      <div class="subtitle">Enter your proxy token to view the status of the providers available to you</div>
+      <h2>服务状态</h2>
+      <div class="subtitle">输入你的 proxy token，以查看你可用的提供商状态</div>
       <div class="form-group">
         <label>Proxy Token</label>
-        <input type="text" id="login-token" placeholder="enter your proxy token..." autofocus>
+        <input type="text" id="login-token" placeholder="请输入你的 proxy token…" autofocus>
       </div>
-      <label class="remember-row"><input type="checkbox" id="login-remember" checked>Remember me</label>
-      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">View Status</button>
+      <label class="remember-row"><input type="checkbox" id="login-remember" checked>记住我</label>
+      <button class="btn btn-primary" style="width:100%;padding:10px" onclick="doLogin()">查看状态</button>
       <div class="error-msg" id="login-error"></div>
     </div>
   </div>
@@ -365,12 +365,12 @@
     <script>
       OneGateHeader.mount('#og-header', {
         active: 'status',
-        title: 'Service Status',
-        actions: '<div class="uptime-display">Uptime: <span id="uptime">-</span></div><button class="btn btn-sm" onclick="loadStatus()">Refresh</button><button class="btn btn-sm" onclick="doLogout()">Logout</button>'
+        title: '服务状态',
+        actions: '<div class="uptime-display">可用性：<span id="uptime">-</span></div><button class="btn btn-sm" onclick="loadStatus()">刷新</button><button class="btn btn-sm" onclick="doLogout()">退出登录</button>'
       });
     </script>
     <div class="container" id="content">
-      <div class="loading">Loading...</div>
+      <div class="loading">加载中……</div>
     </div>
   </div>
 
@@ -443,11 +443,11 @@
     function showTooltip(el, data) {
       const rect = el.getBoundingClientRect();
       let html = `<div class="tooltip-time">${esc(fmtHourFull(data.ts))}</div>`;
-      html += `<div class="tooltip-row"><span>Total:</span><span>${data.total}</span></div>`;
+      html += `<div class="tooltip-row"><span>总计：</span><span>${data.total}</span></div>`;
       if (data.success_rate !== null && data.total > 0) {
-        html += `<div class="tooltip-row"><span>Success:</span><span class="tooltip-rate" style="color:${rateColor(data.success_rate)}">${data.success_rate}%</span></div>`;
+        html += `<div class="tooltip-row"><span>成功：</span><span class="tooltip-rate" style="color:${rateColor(data.success_rate)}">${data.success_rate}%</span></div>`;
       } else if (data.total === 0) {
-        html += `<div class="tooltip-row"><span>Status:</span><span style="color:#484f58">No requests</span></div>`;
+        html += `<div class="tooltip-row"><span>状态：</span><span style="color:#484f58">无请求</span></div>`;
       }
       const errors = data.error_distribution || {};
       if (Object.keys(errors).length > 0) {
@@ -481,7 +481,7 @@
 
     function renderTimeline(hourlyData) {
       if (!hourlyData || hourlyData.length === 0) {
-        return '<div class="no-data">No hourly data yet</div>';
+        return '<div class="no-data">暂无每小时数据</div>';
       }
 
       const bars = hourlyData.map((h, i) => {
@@ -489,7 +489,7 @@
         const color = rateColor(r);
         const hasData = h.total > 0;
         const opacity = hasData ? 1 : 0.25;
-        const title = hasData ? `${fmtHour(h.ts)} — ${r !== null ? r : 'N/A'}% success, ${h.total} req` : `${fmtHour(h.ts)} — no requests`;
+        const title = hasData ? `${fmtHour(h.ts)} — 成功率 ${r !== null ? r : 'N/A'}%，${h.total} 次请求` : `${fmtHour(h.ts)} — 无请求`;
         return `<div class="hour-bar"
           style="background:${color};opacity:${opacity}"
           data-idx="${i}"
@@ -537,9 +537,9 @@
 
       const errorSection = Object.keys(errors24).length > 0
         ? `<div class="error-section">
-            <h4>Error Codes (24h)</h4>
+            <h4>错误码（24h）</h4>
             <table class="error-table">
-              <thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead>
+              <thead><tr><th>状态</th><th>次数</th><th>%</th></tr></thead>
               <tbody>${errorRows}</tbody>
             </table>
           </div>`
@@ -569,17 +569,17 @@
       return `<div class="card" data-provider="${esc(p.name)}">
         <div class="provider-name">${esc(p.name)}</div>
         <div class="provider-meta">
-          Prefix: <code>${esc(p.prefix)}</code> &nbsp; Upstream: <code>${esc(p.upstream)}</code>
+          前缀：<code>${esc(p.prefix)}</code> &nbsp; 上游：<code>${esc(p.upstream)}</code>
         </div>
         <div class="summary-row">${summaryHtml}</div>
         <div class="rate-bar-container">
-          <div class="rate-label"><span>Success Rate (24h)</span><span>${rate24Display}</span></div>
+          <div class="rate-label"><span>成功率（24h）</span><span>${rate24Display}</span></div>
           <div class="rate-bar-bg">
             <div class="rate-bar-fill ${rateColorClass(rate24)}" style="width:${rate24Width}%;background:${rateColor(rate24)}"></div>
           </div>
         </div>
         <div class="timeline-section">
-          <h4>Hourly Timeline (last ${hourly ? hourly.length : 0} hours)</h4>
+          <h4>每小时趋势（最近 ${hourly ? hourly.length : 0} 小时）</h4>
           ${renderTimeline(hourly)}
         </div>
         ${errorSection}
@@ -594,7 +594,7 @@
 
       const content = document.getElementById('content');
       if (!data.providers || data.providers.length === 0) {
-        content.innerHTML = '<div class="no-data">No providers available for this token</div>';
+        content.innerHTML = '<div class="no-data">该 token 没有可用的提供商</div>';
         return;
       }
       const providerOrder = [...data.providers].sort((a, b) => {
@@ -619,7 +619,7 @@
       const token = document.getElementById('login-token').value.trim();
       const errorEl = document.getElementById('login-error');
       if (!token) {
-        errorEl.textContent = 'Please enter your proxy token';
+        errorEl.textContent = '请输入你的 proxy token';
         return;
       }
       errorEl.textContent = '';
@@ -628,11 +628,11 @@
         if (resp.status === 401 || resp.status === 403) {
           let data = {};
           try { data = await resp.json(); } catch (e) { data = {}; }
-          errorEl.textContent = data.error || 'Invalid token';
+          errorEl.textContent = data.error || 'Token 无效';
           return;
         }
         if (!resp.ok) {
-          errorEl.textContent = 'Login failed';
+          errorEl.textContent = '登录失败';
           return;
         }
         const data = await resp.json();
@@ -646,7 +646,7 @@
         document.getElementById('status-content').classList.add('active');
         renderStatus(data);
       } catch (e) {
-        errorEl.textContent = 'Network error';
+        errorEl.textContent = '网络错误';
       }
     }
 
@@ -655,7 +655,7 @@
       window._statusData = {};
       localStorage.removeItem(STATUS_TOKEN_KEY);
       document.getElementById('uptime').textContent = '-';
-      document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+      document.getElementById('content').innerHTML = '<div class="loading">加载中……</div>';
       showLogin('');
       document.getElementById('login-token').value = '';
     }
@@ -669,14 +669,14 @@
           try { data = await resp.json(); } catch (e) { data = {}; }
           proxyToken = null;
           localStorage.removeItem(STATUS_TOKEN_KEY);
-          showLogin(data.error || 'Invalid or disabled token');
+          showLogin(data.error || 'Token 无效或已禁用');
           return;
         }
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
         renderStatus(data);
       } catch (e) {
-        document.getElementById('content').innerHTML = `<div class="error-msg">Failed to load status: ${esc(e.message)}</div>`;
+        document.getElementById('content').innerHTML = `<div class="error-msg">加载状态失败：${esc(e.message)}</div>`;
       }
     }
 
