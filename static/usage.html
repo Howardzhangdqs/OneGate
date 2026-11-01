@@ -433,11 +433,182 @@
       margin-top: 12px;
       flex-wrap: wrap
     }
+
+    .trend-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px
+    }
+
+    .trend-ranges {
+      display: inline-flex;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden
+    }
+
+    .trend-range {
+      background: transparent;
+      border: 0;
+      border-right: 1px solid #30363d;
+      color: #8b949e;
+      font-family: var(--font-all);
+      font-size: 11px;
+      letter-spacing: .5px;
+      padding: 4px 11px;
+      cursor: pointer;
+      transition: background .15s, color .15s
+    }
+
+    .trend-range:last-child { border-right: 0 }
+
+    .trend-range:hover { background: #21262d; color: #c9d1d9 }
+
+    .trend-range[aria-pressed="true"] {
+      background: #1f6feb;
+      color: #fff
+    }
+
+    .trend-range:focus-visible {
+      outline: 1px solid #58a6ff;
+      outline-offset: -1px
+    }
+
+    .trend-sub {
+      font-size: 11px;
+      color: #8b949e;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 10px
+    }
+
+    .trend-sub:empty { margin-bottom: 0 }
+
+    .trend-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 8px
+    }
+
+    .trend-legend .lg {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px
+    }
+
+    .trend-legend .lg-sw {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      display: inline-block
+    }
+
+    .trend-legend .lg-hatch {
+      background: repeating-linear-gradient(45deg, #3d444d 0 1px, transparent 1px 4px);
+      border: 1px solid #30363d
+    }
+
+    .trend-chart {
+      width: 100%;
+      overflow: hidden
+    }
+
+    .trend-chart svg {
+      display: block;
+      width: 100%;
+      height: auto
+    }
+
+    .trend-totals {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 14px
+    }
+
+    .trend-stat {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 10px 12px
+    }
+
+    .trend-stat .v {
+      font-size: 18px;
+      font-weight: 700;
+      color: #c9d1d9;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2
+    }
+
+    .trend-stat .l {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 3px;
+      letter-spacing: .4px
+    }
+
+    .trend-tip {
+      position: fixed;
+      z-index: 500;
+      display: none;
+      min-width: 200px;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .4)
+    }
+
+    .trend-tip.show { display: block }
+
+    .trend-tip .tt-date {
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 5px;
+      font-variant-numeric: tabular-nums
+    }
+
+    .trend-tip .tt-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      line-height: 1.65
+    }
+
+    .trend-tip .tt-row span { color: #8b949e }
+
+    .trend-tip .tt-row b {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums
+    }
+
+    .trend-tip .tt-gap {
+      color: #d29922;
+      font-size: 11px
+    }
+
+    @media (max-width: 560px) {
+      .trend-legend { gap: 4px 12px }
+
+      .trend-totals { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) }
+
+      .trend-tip { max-width: calc(100vw - 20px) }
+    }
   </style>
 </head>
 
 <body>
   <div class="prov-tip" id="prov-tip"></div>
+  <div class="trend-tip" id="trend-tip"></div>
   <div id="og-header"></div>
   <script>
     OneGateHeader.mount('#og-header', {
@@ -501,6 +672,28 @@
           <span style="font-size:12px;color:#8b949e" id="limits-sub"></span>
         </div>
         <div class="limits-grid" id="limits-grid"></div>
+      </div>
+
+      <div class="card" id="trend-card">
+        <div class="trend-head">
+          <h3 style="margin:0">Daily Usage Trend</h3>
+          <div class="trend-ranges" role="group" aria-label="Trend range">
+            <button type="button" class="trend-range" data-range="30" aria-pressed="false" onclick="trendSetRange(30)">30D</button>
+            <button type="button" class="trend-range" data-range="90" aria-pressed="true" onclick="trendSetRange(90)">90D</button>
+            <button type="button" class="trend-range" data-range="3650" aria-pressed="false" onclick="trendSetRange(3650)">All</button>
+          </div>
+        </div>
+        <div class="trend-sub" id="trend-sub"></div>
+        <div class="trend-legend">
+          <span class="lg"><span class="lg-sw" style="background:#3fb950"></span>Successes</span>
+          <span class="lg"><span class="lg-sw" style="background:#f85149"></span>Failed</span>
+          <span class="lg"><span class="lg-sw" style="background:#d29922"></span>Input tokens</span>
+          <span class="lg"><span class="lg-sw" style="background:#58a6ff"></span>Output tokens</span>
+          <span class="lg"><span class="lg-sw lg-hatch"></span>No data</span>
+        </div>
+        <div class="trend-chart" id="trend-chart" style="display:none"></div>
+        <div class="empty" id="trend-empty">Enter a token above to see the daily trend.</div>
+        <div class="trend-totals" id="trend-totals"></div>
       </div>
 
       <div class="card">
@@ -577,7 +770,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="hourly-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:8px">
             <h3 style="margin:0">Hourly Token Usage</h3>
@@ -616,6 +809,12 @@
     const inputToken = document.getElementById('input-token');
     const inputStart = document.getElementById('input-start');
     const inputEnd = document.getElementById('input-end');
+
+    const TREND_DAY = 86400000;
+    let _trendRange = 90;
+    let _trendSeq = 0;
+    let _trendState = null;
+    let _trendWidth = 0;
 
     inputToken.addEventListener('keydown', e => { if (e.key === 'Enter') queryUsage(); });
 
@@ -673,6 +872,8 @@
       if (token) body.token = token;
       if (inputStart.value) body.start = new Date(inputStart.value).toISOString();
       if (inputEnd.value) body.end = new Date(inputEnd.value).toISOString();
+
+      trendLoad();
 
       try {
         const resp = await fetch('/usage/api', {
@@ -900,15 +1101,20 @@
       }
 
       const allProvSet = new Set(providerNames);
-      Object.values(data.hourly).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
+      Object.values(data.hourly || {}).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
       const allProv = [...allProvSet].sort();
 
       const allClientSet = new Set();
       Object.values(data.hourly_by_client || {}).forEach(h => Object.keys(h).forEach(c => allClientSet.add(c)));
       const allClients = [...allClientSet].sort();
 
-      _lastData = { hourly: data.hourly, allProv, hourly_by_client: data.hourly_by_client || {}, allClients };
-      renderHourly({ hourly: data.hourly, allProv, hourly_by_client: data.hourly_by_client || {}, allClients });
+      _lastData = { hourly: data.hourly || {}, allProv, hourly_by_client: data.hourly_by_client || {}, allClients };
+      const _rngStart = Date.parse((data.range || {}).start);
+      const _rngEnd = Date.parse((data.range || {}).end);
+      const _spanSec = (_rngEnd - _rngStart) / 1000;
+      const _hideHourly = Number.isFinite(_spanSec) && _spanSec > 3 * 86400;
+      document.getElementById('hourly-card').style.display = _hideHourly ? 'none' : '';
+      renderHourly({ hourly: data.hourly || {}, allProv, hourly_by_client: data.hourly_by_client || {}, allClients });
       renderTokens(data.tokens || {});
       renderClients(data.clients || {});
       fetchPricing().then(() => renderModels(data.models || {}));
@@ -1046,6 +1252,7 @@
         curHour.by_provider[d.provider] = (curHour.by_provider[d.provider] || 0) + (d.requests || 0);
       }
 
+      if (!_usageData.hourly) _usageData.hourly = {};
       if (!_usageData.hourly[hourKey]) _usageData.hourly[hourKey] = {};
       const hSlot = _usageData.hourly[hourKey];
       if (!hSlot[d.provider]) hSlot[d.provider] = { input: 0, output: 0, cache_read: 0, cache_write: 0, requests: 0 };
@@ -1102,15 +1309,15 @@
 
       const providerNames = Object.keys(_usageData.current_hour.by_provider || {});
       const allProvSet = new Set(providerNames);
-      Object.values(_usageData.hourly).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
+      Object.values(_usageData.hourly || {}).forEach(h => Object.keys(h).forEach(p => allProvSet.add(p)));
       const allProv = [...allProvSet].sort();
 
       const allClientSet = new Set();
       Object.values(_usageData.hourly_by_client || {}).forEach(h => Object.keys(h).forEach(c => allClientSet.add(c)));
       const allClients = [...allClientSet].sort();
 
-      _lastData = { hourly: _usageData.hourly, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients };
-      renderHourly({ hourly: _usageData.hourly, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients });
+      _lastData = { hourly: _usageData.hourly || {}, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients };
+      renderHourly({ hourly: _usageData.hourly || {}, allProv, hourly_by_client: _usageData.hourly_by_client || {}, allClients });
       renderTokens(_usageData.tokens || {});
       renderClients(_usageData.clients || {});
       renderModels(_usageData.models || {});
@@ -1430,6 +1637,419 @@
           tip.classList.remove('show');
         }
       });
+    })();
+
+    function trendDstr(ms) {
+      const d = new Date(ms);
+      const p = n => String(n).padStart(2, '0');
+      return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+    }
+
+    function trendMs(dateStr) {
+      const p = String(dateStr).split('-');
+      return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+
+    function trendTodayMs() {
+      const n = new Date();
+      return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
+    }
+
+    function trendRowDate(d) {
+      if (!d) return null;
+      if (typeof d.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) return d.date;
+      if (d.day != null && isFinite(Number(d.day))) return trendDstr(Number(d.day) * 1000);
+      return null;
+    }
+
+    function trendFmtFull(v) {
+      return Math.round(Number(v) || 0).toLocaleString('en-US');
+    }
+
+    function trendAxisNum(v) {
+      const n = Number(v) || 0;
+      const trim = x => String(Math.round(x * 10) / 10);
+      if (Math.abs(n) >= 1e6) return trim(n / 1e6) + 'M';
+      if (Math.abs(n) >= 1e3) return trim(n / 1e3) + 'k';
+      return String(Math.round(n));
+    }
+
+    function trendNiceMax(v) {
+      if (!(v > 0)) return 4;
+      if (v <= 4) return 4;
+      const base = Math.pow(10, Math.floor(Math.log10(v)));
+      const f = v / base;
+      let m = 10;
+      if (f <= 1) m = 1;
+      else if (f <= 2) m = 2;
+      else if (f <= 2.5) m = 2.5;
+      else if (f <= 5) m = 5;
+      return m * base;
+    }
+
+    function trendSetRange(range) {
+      if (_trendRange === range) return;
+      _trendRange = range;
+      document.querySelectorAll('.trend-range').forEach(btn => {
+        btn.setAttribute('aria-pressed', btn.dataset.range === String(range) ? 'true' : 'false');
+      });
+      trendLoad();
+    }
+
+    function trendEmpty(msg) {
+      _trendState = null;
+      _trendWidth = 0;
+      document.getElementById('trend-chart').style.display = 'none';
+      document.getElementById('trend-totals').innerHTML = '';
+      document.getElementById('trend-sub').textContent = '';
+      const el = document.getElementById('trend-empty');
+      el.className = 'empty';
+      el.textContent = msg;
+      el.style.display = '';
+      document.getElementById('trend-tip').classList.remove('show');
+    }
+
+    function trendErrText(status, body) {
+      if (status === 401) return 'No token sent — enter your proxy token above.';
+      if (status === 403) return 'Invalid or disabled token.';
+      if (status === 400) return 'Invalid range requested.';
+      return (body && body.error) || ('Failed to load the trend (HTTP ' + status + ').');
+    }
+
+    async function trendLoad() {
+      const token = inputToken.value.trim();
+      const seq = ++_trendSeq;
+      if (!token) { trendEmpty('Enter a token above to see the daily trend.'); return; }
+
+      const emptyEl = document.getElementById('trend-empty');
+      document.getElementById('trend-chart').style.display = 'none';
+      document.getElementById('trend-totals').innerHTML = '';
+      document.getElementById('trend-sub').textContent = '';
+      emptyEl.className = 'empty';
+      emptyEl.textContent = 'Loading trend...';
+      emptyEl.style.display = '';
+
+      try {
+        const resp = await fetch('/usage/api/daily?days=' + _trendRange, {
+          headers: { 'X-Proxy-Token': token },
+        });
+        if (seq !== _trendSeq) return;
+        let body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (seq !== _trendSeq) return;
+        if (!resp.ok) { trendEmpty(trendErrText(resp.status, body)); return; }
+        _trendState = trendModel(body, _trendRange);
+        trendRender();
+      } catch (e) {
+        if (seq !== _trendSeq) return;
+        trendEmpty('Network error: ' + e.message);
+      }
+    }
+
+    function trendModel(body, range) {
+      const rows = [];
+      ((body && body.days) || []).forEach(d => {
+        const date = trendRowDate(d);
+        if (!date) return;
+        rows.push({
+          date: date,
+          requests: Math.max(0, Number(d.requests) || 0),
+          successes: Math.max(0, Number(d.successes) || 0),
+          input_tokens: Math.max(0, Number(d.input_tokens) || 0),
+          output_tokens: Math.max(0, Number(d.output_tokens) || 0),
+          cache_read: Math.max(0, Number(d.cache_read) || 0),
+        });
+      });
+      rows.sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+      const byDate = new Map();
+      rows.forEach(r => byDate.set(r.date, r));
+
+      const today = trendTodayMs();
+      let startMs, endMs;
+      if (range >= 3650) {
+        if (rows.length) {
+          startMs = trendMs(rows[0].date);
+          endMs = trendMs(rows[rows.length - 1].date);
+          if (endMs - startMs > (range - 1) * TREND_DAY) startMs = endMs - (range - 1) * TREND_DAY;
+        } else {
+          endMs = today;
+          startMs = today - (range - 1) * TREND_DAY;
+        }
+      } else {
+        const lastMs = rows.length ? trendMs(rows[rows.length - 1].date) : today;
+        endMs = lastMs >= today - TREND_DAY ? lastMs : today;
+        startMs = endMs - (range - 1) * TREND_DAY;
+      }
+
+      const n = Math.max(1, Math.round((endMs - startMs) / TREND_DAY) + 1);
+      const cols = [];
+      for (let i = 0; i < n; i++) {
+        const date = trendDstr(startMs + i * TREND_DAY);
+        cols.push({ date: date, i: i, row: byDate.get(date) || null });
+      }
+
+      let requests = 0, successes = 0, tokens = 0, daysWithData = 0;
+      let maxRequests = 0, maxTokens = 0, gapDays = 0, firstIdx = -1, lastIdx = -1;
+      const runs = [];
+      let runStart = -1;
+      cols.forEach(c => {
+        if (c.row) {
+          if (runStart >= 0) { runs.push({ start: runStart, end: c.i - 1 }); runStart = -1; }
+          if (firstIdx < 0) firstIdx = c.i;
+          lastIdx = c.i;
+          const t = c.row.input_tokens + c.row.output_tokens;
+          requests += c.row.requests;
+          successes += c.row.successes;
+          tokens += t;
+          daysWithData++;
+          if (c.row.requests > maxRequests) maxRequests = c.row.requests;
+          if (t > maxTokens) maxTokens = t;
+        } else {
+          gapDays++;
+          if (runStart < 0) runStart = c.i;
+        }
+      });
+      if (runStart >= 0) runs.push({ start: runStart, end: n - 1 });
+
+      return {
+        n: n,
+        cols: cols,
+        runs: runs,
+        gapDays: gapDays,
+        gapRuns: runs.length,
+        firstIdx: firstIdx,
+        lastIdx: lastIdx,
+        hasData: daysWithData > 0,
+        maxRequests: maxRequests,
+        maxTokens: maxTokens,
+        startDate: cols[0].date,
+        endDate: cols[n - 1].date,
+        totals: { requests: requests, successes: successes, tokens: tokens, daysWithData: daysWithData },
+        layout: null,
+      };
+    }
+
+    function trendRender() {
+      const m = _trendState;
+      if (!m) return;
+      if (!m.hasData) { trendEmpty('No usage recorded in the selected range.'); return; }
+
+      const wrap = document.getElementById('trend-chart');
+      document.getElementById('trend-empty').style.display = 'none';
+      wrap.style.display = '';
+
+      const W = Math.round(Math.max(300, wrap.clientWidth || 640));
+      _trendWidth = W;
+      const padL = 46, padR = 10, padTop = 20, gapY = 32, axisH = 24;
+      const panelH = W < 460 ? 84 : 106;
+      const p1y = padTop;
+      const p2y = padTop + panelH + gapY;
+      const yB1 = p1y + panelH;
+      const yB2 = p2y + panelH;
+      const H = yB2 + axisH;
+      const x0 = padL, x1 = W - padR;
+      const plotW = Math.max(40, x1 - x0);
+      const step = plotW / m.n;
+      const barW = Math.max(0.6, Math.min(26, step * 0.72));
+      const maxReq = trendNiceMax(m.maxRequests);
+      const maxTok = trendNiceMax(m.maxTokens);
+      const f = v => Math.round(v * 10) / 10;
+      const out = [];
+
+      out.push('<defs><pattern id="trendGapPat" width="6" height="6" patternUnits="userSpaceOnUse">' +
+        '<path d="M0 6L6 0" stroke="#3d444d" stroke-width="1" fill="none"/></pattern></defs>');
+
+      m.runs.forEach(r => {
+        const gx = x0 + r.start * step;
+        const gw = (r.end - r.start + 1) * step;
+        out.push('<rect x="' + f(gx) + '" y="' + p1y + '" width="' + f(gw) + '" height="' + (yB2 - p1y) +
+          '" fill="url(#trendGapPat)" opacity=".55"/>');
+      });
+
+      const grid = (y0, y1, max) => {
+        let s = '';
+        for (let i = 0; i <= 4; i++) {
+          const y = y1 - (i / 4) * (y1 - y0);
+          s += '<line x1="' + x0 + '" y1="' + f(y) + '" x2="' + x1 + '" y2="' + f(y) +
+            '" stroke="' + (i === 0 ? '#30363d' : '#21262d') + '" stroke-width="1"/>';
+          s += '<text x="' + (x0 - 8) + '" y="' + f(y) +
+            '" text-anchor="end" dominant-baseline="middle" font-size="9.5" fill="#484f58">' +
+            trendAxisNum(max * i / 4) + '</text>';
+        }
+        return s;
+      };
+      out.push(grid(p1y, yB1, maxReq));
+      out.push(grid(p2y, yB2, maxTok));
+
+      const edgeLine = idx => '<line x1="' + f(x0 + idx * step + step / 2) + '" y1="' + p1y +
+        '" x2="' + f(x0 + idx * step + step / 2) + '" y2="' + yB2 +
+        '" stroke="#58a6ff" stroke-width="1" stroke-dasharray="2 4" opacity=".3"/>';
+      if (m.firstIdx > 0) out.push(edgeLine(m.firstIdx));
+      if (m.lastIdx >= 0 && m.lastIdx < m.n - 1) out.push(edgeLine(m.lastIdx));
+
+      const rectD = (x, y, w, h) => h <= 0.05 ? '' :
+        'M' + f(x) + ' ' + f(y) + 'h' + f(w) + 'v' + f(h) + 'h' + f(-w) + 'z';
+      let succPath = '', failPath = '', inPath = '', outPath = '';
+      m.cols.forEach(c => {
+        if (!c.row) return;
+        const x = x0 + c.i * step + (step - barW) / 2;
+        const r = c.row;
+        const succ = Math.min(r.requests, r.successes);
+        let hReq = r.requests > 0 ? r.requests / maxReq * panelH : 0;
+        let hSucc = succ > 0 ? succ / maxReq * panelH : 0;
+        if (hReq > 0 && hReq < 1) { const k = hSucc / hReq; hReq = 1; hSucc = k; }
+        succPath += rectD(x, yB1 - hSucc, barW, hSucc);
+        failPath += rectD(x, yB1 - hReq, barW, hReq - hSucc);
+
+        const tok = r.input_tokens + r.output_tokens;
+        let hTok = tok > 0 ? tok / maxTok * panelH : 0;
+        let hIn = r.input_tokens > 0 ? r.input_tokens / maxTok * panelH : 0;
+        if (hTok > 0 && hTok < 1) { const k = hIn / hTok; hTok = 1; hIn = k; }
+        inPath += rectD(x, yB2 - hIn, barW, hIn);
+        outPath += rectD(x, yB2 - hTok, barW, hTok - hIn);
+      });
+      if (succPath) out.push('<path d="' + succPath + '" fill="#3fb950"/>');
+      if (failPath) out.push('<path d="' + failPath + '" fill="#f85149"/>');
+      if (inPath) out.push('<path d="' + inPath + '" fill="#d29922"/>');
+      if (outPath) out.push('<path d="' + outPath + '" fill="#58a6ff"/>');
+
+      out.push('<text x="' + x0 + '" y="' + (p1y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">REQUESTS</text>');
+      out.push('<text x="' + x0 + '" y="' + (p2y - 7) + '" font-size="10" letter-spacing=".6" fill="#8b949e">TOKENS · IN + OUT</text>');
+
+      const ticks = Math.max(2, Math.min(8, Math.floor(plotW / 78)));
+      const used = new Set();
+      for (let k = 0; k < ticks; k++) {
+        const idx = m.n === 1 ? 0 : Math.round(k * (m.n - 1) / (ticks - 1));
+        if (used.has(idx)) continue;
+        used.add(idx);
+        const col = m.cols[idx];
+        if (!col) continue;
+        let tx = x0 + idx * step + step / 2;
+        let anchor = 'middle';
+        if (idx === 0) { tx = x0; anchor = 'start'; }
+        else if (idx === m.n - 1) { tx = x1; anchor = 'end'; }
+        out.push('<text x="' + f(tx) + '" y="' + (yB2 + 16) + '" text-anchor="' + anchor +
+          '" font-size="10" fill="#484f58">' + col.date.slice(5) + '</text>');
+      }
+
+      out.push('<rect id="trend-hover" x="0" y="' + p1y + '" width="0" height="' + (yB2 - p1y) +
+        '" fill="rgba(88,166,255,.10)" visibility="hidden" pointer-events="none"/>');
+
+      const t = m.totals;
+      const aria = 'Daily usage trend chart, ' + m.startDate + ' to ' + m.endDate + '. ' +
+        t.daysWithData + ' of ' + m.n + ' days have data' +
+        (m.gapDays > 0 ? ', ' + m.gapDays + ' days have no recorded data' : '') + '. ' +
+        'Total ' + trendFmtFull(t.requests) + ' requests and ' + trendFmtFull(t.tokens) + ' tokens. ' +
+        'Top panel shows requests (successes and failed), bottom panel shows input and output tokens.';
+
+      wrap.innerHTML = '<svg id="trend-svg" role="img" aria-label="' + escAttr(aria) + '" viewBox="0 0 ' +
+        W + ' ' + H + '" width="' + W + '" height="' + H + '">' + out.join('') + '</svg>';
+
+      m.layout = { W: W, x0: x0, x1: x1, plotW: plotW, step: step, p1y: p1y, yB2: yB2 };
+      m.hoverIdx = -1;
+      _trendState = m;
+
+      document.getElementById('trend-sub').textContent =
+        m.startDate + ' → ' + m.endDate + ' · ' + m.n + ' days · ' + t.daysWithData + ' with data' +
+        (m.gapRuns > 0 ? ' · ' + m.gapRuns + ' gap' + (m.gapRuns > 1 ? 's' : '') : '');
+
+      const stat = (v, l, color) => '<div class="trend-stat"><div class="v"' +
+        (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div><div class="l">' + l + '</div></div>';
+      let statsHtml =
+        stat(trendFmtFull(t.requests), 'Requests in range') +
+        stat(t.requests > 0 ? (t.successes / t.requests * 100).toFixed(1) + '%' : '–', 'Success rate', '#3fb950') +
+        stat(trendFmtFull(t.tokens), 'Tokens in + out', '#58a6ff') +
+        stat(t.daysWithData + ' / ' + m.n, 'Days with data');
+      if (m.gapDays > 0) statsHtml += stat(String(m.gapDays), 'Days with no data', '#d29922');
+      document.getElementById('trend-totals').innerHTML = statsHtml;
+    }
+
+    function trendTipHtml(col) {
+      if (!col.row) {
+        return '<div class="tt-date">' + esc(col.date) + '</div>' +
+          '<div class="tt-gap">No data recorded for this day</div>';
+      }
+      const r = col.row;
+      const failed = Math.max(0, r.requests - r.successes);
+      const rate = r.requests > 0 ? (r.successes / r.requests * 100).toFixed(1) + '%' : '–';
+      const row = (k, v) => '<div class="tt-row"><span>' + k + '</span><b>' + v + '</b></div>';
+      return '<div class="tt-date">' + esc(col.date) + '</div>' +
+        row('Requests', trendFmtFull(r.requests)) +
+        row('Successes', trendFmtFull(r.successes) + ' · ' + rate) +
+        row('Failed', trendFmtFull(failed)) +
+        row('Input tokens', trendFmtFull(r.input_tokens)) +
+        row('Output tokens', trendFmtFull(r.output_tokens)) +
+        row('Total tokens', trendFmtFull(r.input_tokens + r.output_tokens)) +
+        (r.cache_read ? row('Cache read', trendFmtFull(r.cache_read)) : '');
+    }
+
+    function trendTipPos(cx, cy) {
+      const tip = document.getElementById('trend-tip');
+      let x = cx + 14, y = cy + 14;
+      const r = tip.getBoundingClientRect();
+      if (x + r.width > window.innerWidth - 8) x = cx - r.width - 14;
+      if (y + r.height > window.innerHeight - 8) y = cy - r.height - 14;
+      tip.style.left = Math.max(8, x) + 'px';
+      tip.style.top = Math.max(8, y) + 'px';
+    }
+
+    function trendHoverFromEvent(e) {
+      const m = _trendState;
+      if (!m || !m.layout) return;
+      const svg = document.getElementById('trend-svg');
+      if (!svg) return;
+      const box = svg.getBoundingClientRect();
+      if (!box.width) return;
+      const L = m.layout;
+      const px = (e.clientX - box.left) * (L.W / box.width);
+      if (px < L.x0 - 2 || px > L.x1 + 2) { trendHoverOut(); return; }
+      let idx = Math.floor((px - L.x0) / L.step);
+      idx = Math.max(0, Math.min(m.n - 1, idx));
+      const col = m.cols[idx];
+      if (!col) { trendHoverOut(); return; }
+
+      const hv = document.getElementById('trend-hover');
+      if (m.hoverIdx !== idx) {
+        m.hoverIdx = idx;
+        if (hv) {
+          const hx = L.x0 + idx * L.step;
+          hv.setAttribute('x', String(Math.round(hx)));
+          hv.setAttribute('width', String(Math.max(1, Math.round(Math.min(L.step, L.x1 - hx)))));
+          hv.setAttribute('visibility', 'visible');
+        }
+        document.getElementById('trend-tip').innerHTML = trendTipHtml(col);
+      }
+      const tip = document.getElementById('trend-tip');
+      tip.classList.add('show');
+      trendTipPos(e.clientX, e.clientY);
+    }
+
+    function trendHoverOut() {
+      const hv = document.getElementById('trend-hover');
+      if (hv) hv.setAttribute('visibility', 'hidden');
+      document.getElementById('trend-tip').classList.remove('show');
+    }
+
+    (function initTrend() {
+      const wrap = document.getElementById('trend-chart');
+      wrap.addEventListener('mousemove', trendHoverFromEvent);
+      wrap.addEventListener('mouseleave', trendHoverOut);
+      window.addEventListener('scroll', trendHoverOut, { passive: true });
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(function () {
+          if (!_trendState) return;
+          const w = wrap.clientWidth;
+          if (!w || Math.abs(w - _trendWidth) < 2) return;
+          requestAnimationFrame(trendRender);
+        }).observe(wrap);
+      } else {
+        window.addEventListener('resize', function () {
+          if (!_trendState) return;
+          const w = wrap.clientWidth;
+          if (!w || Math.abs(w - _trendWidth) < 2) return;
+          trendRender();
+        });
+      }
     })();
   </script>
 </body>

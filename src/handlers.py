@@ -240,6 +240,7 @@ async def _query_usage(token, token_pool, db_conn, cfg, start_str=None, end_str=
 
     start_hour = start_ts - (start_ts % 3600)
     end_hour = end_ts - (end_ts % 3600)
+    skip_hourly = (end_ts - start_ts) > 3 * 86400
 
     cur = db_conn.execute(
         "SELECT provider, ts - (ts % 3600) AS hour_ts, SUM(count) AS cnt "
@@ -250,51 +251,52 @@ async def _query_usage(token, token_pool, db_conn, cfg, start_str=None, end_str=
     )
     rows = cur.fetchall()
 
-    req_by_provider: dict[str, dict[int, int]] = {}
-    for provider_name, hour_ts, cnt in rows:
-        req_by_provider.setdefault(provider_name, {})[hour_ts] = cnt
-
-    tok_cur = db_conn.execute(
-        "SELECT provider, ts - (ts % 3600) AS hour_ts, "
-        "SUM(input_tokens), SUM(output_tokens), "
-        "SUM(cache_read), SUM(cache_write) "
-        "FROM token_usage_log "
-        + where
-        + " GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
-        _params(start_hour, end_hour + 3600),
-    )
-    tok_rows = tok_cur.fetchall()
-
-    tok_by_provider: dict[str, dict[int, dict[str, int]]] = {}
-    for provider_name, hour_ts, it, ot, cr, cw in tok_rows:
-        tok_by_provider.setdefault(provider_name, {})[hour_ts] = {
-            "input": it or 0,
-            "output": ot or 0,
-            "cache_read": cr or 0,
-            "cache_write": cw or 0,
-        }
-
-    all_providers = set(tok_by_provider) | set(req_by_provider)
+    total = sum(cnt for _, _, cnt in rows)
 
     hourly: dict[str, dict[str, dict]] = {}
-    t = start_hour
-    while t <= end_hour:
-        dt = datetime.fromtimestamp(t, tz=timezone.utc)
-        key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        hourly[key] = {}
-        for prov_name in all_providers:
-            tok = tok_by_provider.get(prov_name, {}).get(t, {})
-            req = req_by_provider.get(prov_name, {}).get(t, 0)
-            hourly[key][prov_name] = {
-                "input": tok.get("input", 0),
-                "output": tok.get("output", 0),
-                "cache_read": tok.get("cache_read", 0),
-                "cache_write": tok.get("cache_write", 0),
-                "requests": req,
-            }
-        t += 3600
+    if not skip_hourly:
+        req_by_provider: dict[str, dict[int, int]] = {}
+        for provider_name, hour_ts, cnt in rows:
+            req_by_provider.setdefault(provider_name, {})[hour_ts] = cnt
 
-    total = sum(cnt for _, _, cnt in rows)
+        tok_cur = db_conn.execute(
+            "SELECT provider, ts - (ts % 3600) AS hour_ts, "
+            "SUM(input_tokens), SUM(output_tokens), "
+            "SUM(cache_read), SUM(cache_write) "
+            "FROM token_usage_log "
+            + where
+            + " GROUP BY provider, hour_ts ORDER BY provider, hour_ts",
+            _params(start_hour, end_hour + 3600),
+        )
+        tok_rows = tok_cur.fetchall()
+
+        tok_by_provider: dict[str, dict[int, dict[str, int]]] = {}
+        for provider_name, hour_ts, it, ot, cr, cw in tok_rows:
+            tok_by_provider.setdefault(provider_name, {})[hour_ts] = {
+                "input": it or 0,
+                "output": ot or 0,
+                "cache_read": cr or 0,
+                "cache_write": cw or 0,
+            }
+
+        all_providers = set(tok_by_provider) | set(req_by_provider)
+
+        t = start_hour
+        while t <= end_hour:
+            dt = datetime.fromtimestamp(t, tz=timezone.utc)
+            key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            hourly[key] = {}
+            for prov_name in all_providers:
+                tok = tok_by_provider.get(prov_name, {}).get(t, {})
+                req = req_by_provider.get(prov_name, {}).get(t, 0)
+                hourly[key][prov_name] = {
+                    "input": tok.get("input", 0),
+                    "output": tok.get("output", 0),
+                    "cache_read": tok.get("cache_read", 0),
+                    "cache_write": tok.get("cache_write", 0),
+                    "requests": req,
+                }
+            t += 3600
 
     summary: dict[str, int] = {}
     for label, hours in [("last_24h", 24), ("last_7d", 168), ("last_30d", 720)]:
@@ -322,7 +324,11 @@ async def _query_usage(token, token_pool, db_conn, cfg, start_str=None, end_str=
     clients_summary = get_token_client_usage_detail(
         db_conn, site_token, start_ts, end_ts
     )
-    client_hourly_raw = get_token_client_hourly(db_conn, site_token, start_ts, end_ts)
+    client_hourly_raw = (
+        {}
+        if skip_hourly
+        else get_token_client_hourly(db_conn, site_token, start_ts, end_ts)
+    )
 
     models_breakdown = get_token_usage_by_model(db_conn, site_token, start_ts, end_ts)
     pricing_map = get_pricing_map(db_conn)
@@ -340,22 +346,23 @@ async def _query_usage(token, token_pool, db_conn, cfg, start_str=None, end_str=
     )
 
     hourly_by_client: dict[str, dict[str, dict]] = {}
-    all_clients = set(client_hourly_raw)
-    t = start_hour
-    while t <= end_hour:
-        dt = datetime.fromtimestamp(t, tz=timezone.utc)
-        key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        hourly_by_client[key] = {}
-        for c_name in all_clients:
-            slot = client_hourly_raw.get(c_name, {}).get(t, {})
-            hourly_by_client[key][c_name] = {
-                "input": slot.get("input", 0),
-                "output": slot.get("output", 0),
-                "cache_read": slot.get("cache_read", 0),
-                "cache_write": slot.get("cache_write", 0),
-                "requests": slot.get("requests", 0),
-            }
-        t += 3600
+    if not skip_hourly:
+        all_clients = set(client_hourly_raw)
+        t = start_hour
+        while t <= end_hour:
+            dt = datetime.fromtimestamp(t, tz=timezone.utc)
+            key = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            hourly_by_client[key] = {}
+            for c_name in all_clients:
+                slot = client_hourly_raw.get(c_name, {}).get(t, {})
+                hourly_by_client[key][c_name] = {
+                    "input": slot.get("input", 0),
+                    "output": slot.get("output", 0),
+                    "cache_read": slot.get("cache_read", 0),
+                    "cache_write": slot.get("cache_write", 0),
+                    "requests": slot.get("requests", 0),
+                }
+            t += 3600
 
     return {
         "token": token or "",
