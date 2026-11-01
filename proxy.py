@@ -146,6 +146,15 @@ async def main():
         v1_get_model,
     ) = create_v1_handlers(cfg, token_pool, db_conn, monitor, usage_monitor)
 
+    if not cfg.enable_v1:
+
+        async def v1_disabled(_request: web.Request) -> web.Response:
+            return web.json_response(
+                {"error": "v1 routes are disabled (enable_v1 = false)"}, status=410
+            )
+
+        v1_chat_completions = v1_responses = v1_list_models = v1_get_model = v1_disabled
+
     app = web.Application(
         client_max_size=100 * 1024 * 1024,
         handler_args={"keepalive_timeout": 75},

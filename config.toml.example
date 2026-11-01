@@ -3,6 +3,13 @@ intercept_port = 0
 enable_log = false
 # log_format = "full"   # "full" = per-request .json with body (default), "headers" = daily .jsonl with headers only
 
+# OpenAI-compatible /v1/* and /litellm/v1/* endpoints. They are backed by the
+# litellm dependency, which costs ~200 MB of RSS and ~1.9s on first use.
+# Set to false when no client needs them; the routes then answer 410 Gone
+# without importing litellm. Plain proxying through a provider prefix is
+# unaffected.
+enable_v1 = true
+
 # Client tool recognition is always on (no config needed): each request is
 # fingerprinted by User-Agent / headers into a client name (claude-code, codex,
 # opencode, zcode, cursor, ...) and recorded in client_usage_log. View the
