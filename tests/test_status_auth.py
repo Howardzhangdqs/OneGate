@@ -86,6 +86,7 @@ class TestStatusAuth(AioHTTPTestCase):
             _,
             _,
             _,
+            _,
         ) = create_handlers(
             self.cfg,
             self.token_pool,

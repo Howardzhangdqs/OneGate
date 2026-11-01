@@ -2,6 +2,7 @@ import asyncio
 import logging
 import mimetypes
 import os
+import sqlite3
 import ssl
 import time
 
@@ -16,7 +17,7 @@ from src.admin import (
     create_site_model_handlers,
 )
 from src.config import load_config
-from src.db import init_db
+from src.db import init_db, rollup_and_purge
 from src.handlers import create_handlers
 from src.model_catalog import create_catalog_handlers
 from src.network import fetch_public_ip
@@ -31,6 +32,7 @@ mimetypes.add_type("font/woff", ".woff")
 mimetypes.add_type("font/woff2", ".woff2")
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 logging.basicConfig(
@@ -50,6 +52,25 @@ async def main():
         cfg.usage_db, cfg.pool_file, cfg.admin_tokens, cfg.pool_count
     )
     token_pool = load_pool_from_db(db_conn)
+
+    rollup_task: asyncio.Task | None = None
+
+    def _rollup_job() -> None:
+        conn = sqlite3.connect(cfg.usage_db)
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            rollup_and_purge(conn)
+        finally:
+            conn.close()
+
+    async def rollup_loop():
+        while True:
+            await asyncio.sleep(6 * 3600)
+            try:
+                await asyncio.get_running_loop().run_in_executor(None, _rollup_job)
+            except Exception:
+                logger.exception("daily rollup failed")
 
     if generated_admins:
         for t in generated_admins:
@@ -76,7 +97,17 @@ async def main():
         auto_decompress=True,
     )
 
+    async def on_startup(_app: web.Application):
+        nonlocal rollup_task
+        rollup_task = asyncio.create_task(rollup_loop())
+
     async def on_cleanup(app: web.Application):
+        if rollup_task is not None:
+            rollup_task.cancel()
+            try:
+                await rollup_task
+            except asyncio.CancelledError:
+                pass
         await session.close()
 
     monitor = ThroughputMonitor(token_pool)
@@ -98,6 +129,7 @@ async def main():
         clients_api_handler,
         usage_stream_api,
         usage_sse_handler,
+        daily_usage_api,
     ) = create_handlers(
         cfg,
         token_pool,
@@ -154,11 +186,13 @@ async def main():
         client_max_size=100 * 1024 * 1024,
         handler_args={"keepalive_timeout": 75},
     )
+    app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     app.router.add_static("/static", STATIC_DIR)
     app.router.add_get("/usage", serve_usage_page)
     app.router.add_get("/usage/api/quota", quota_api_handler)
     app.router.add_post("/usage/api", info_api_handler)
+    app.router.add_get("/usage/api/daily", daily_usage_api)
     app.router.add_post("/usage/api/stream", usage_stream_api)
     app.router.add_get("/usage/events", usage_sse_handler)
     app.router.add_get("/admin", serve_admin_page)

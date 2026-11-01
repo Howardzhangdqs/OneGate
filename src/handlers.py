@@ -17,6 +17,8 @@ from src.db import (
     check_rate_limit,
     compute_cost,
     get_client_usage_detail,
+    get_daily_usage,
+    get_daily_usage_by_provider,
     get_global_client_hourly,
     get_global_client_summary,
     get_pricing_map,
@@ -1093,6 +1095,27 @@ def create_handlers(
 
         return resp
 
+    async def daily_usage_api(request: web.Request) -> web.Response:
+        token = request.headers.get("X-Proxy-Token", "").strip()
+        if not token:
+            return web.json_response({"error": "missing X-Proxy-Token"}, status=401)
+        entry = token_pool.get(token)
+        if not entry or not entry.enabled:
+            return web.json_response({"error": "invalid or disabled token"}, status=403)
+
+        days = request.query.get("days", "90")
+        try:
+            days = int(days)
+        except ValueError:
+            return web.json_response({"error": "invalid days"}, status=400)
+        days = max(1, min(3650, days))
+        return web.json_response(
+            {
+                "days": get_daily_usage(db_conn, days),
+                "providers": get_daily_usage_by_provider(db_conn, days),
+            }
+        )
+
     return (
         serve_usage_page,
         info_api_handler,
@@ -1103,4 +1126,5 @@ def create_handlers(
         clients_api_handler,
         usage_stream_api,
         usage_sse_handler,
+        daily_usage_api,
     )

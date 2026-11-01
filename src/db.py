@@ -277,6 +277,208 @@ def _migrate_pool_json(
         print(f"[DB] Imported {imported} tokens from pool.json, backed up to {backup}")
 
 
+def rollup_day(conn, day: int) -> None:
+    end = day + 86400
+    conn.execute("DELETE FROM daily_requests WHERE day = ?", (day,))
+    conn.execute(
+        "INSERT INTO daily_requests (token, provider, day, requests, successes) "
+        "SELECT token, provider, ?, COALESCE(SUM(count), 0), 0 FROM request_log "
+        "WHERE ts >= ? AND ts < ? GROUP BY token, provider",
+        (day, day, end),
+    )
+    conn.execute(
+        "INSERT INTO daily_requests (token, provider, day, requests, successes) "
+        "SELECT token, provider, ?, 0, COALESCE(SUM(count), 0) FROM success_log "
+        "WHERE ts >= ? AND ts < ? GROUP BY token, provider "
+        "ON CONFLICT(token, provider, day) DO UPDATE SET successes = excluded.successes",
+        (day, day, end),
+    )
+    conn.execute("DELETE FROM daily_tokens WHERE day = ?", (day,))
+    conn.execute(
+        "INSERT INTO daily_tokens (token, provider, model, day, input_tokens, "
+        "output_tokens, cache_read, cache_write) "
+        "SELECT token, provider, model, ?, COALESCE(SUM(input_tokens), 0), "
+        "COALESCE(SUM(output_tokens), 0), COALESCE(SUM(cache_read), 0), "
+        "COALESCE(SUM(cache_write), 0) FROM token_usage_log "
+        "WHERE ts >= ? AND ts < ? GROUP BY token, provider, model",
+        (day, day, end),
+    )
+    conn.execute(
+        "UPDATE daily_requests SET requests = successes "
+        "WHERE day = ? AND requests < successes",
+        (day,),
+    )
+
+
+def rollup_and_purge(conn, retain_days: int = 35, now: int | None = None) -> None:
+    now = int(time.time()) if now is None else now
+    today = now - now % 86400
+    cutoff = now - retain_days * 86400
+    rows = conn.execute(
+        "SELECT DISTINCT d FROM ("
+        "SELECT (ts - ts % 86400) AS d FROM request_log WHERE ts >= ? "
+        "UNION SELECT (ts - ts % 86400) FROM token_usage_log WHERE ts >= ? "
+        "UNION SELECT (ts - ts % 86400) FROM success_log WHERE ts >= ?)",
+        (cutoff, cutoff, cutoff),
+    ).fetchall()
+    for (day,) in rows:
+        done = conn.execute(
+            "SELECT complete FROM daily_rollup WHERE day = ?", (day,)
+        ).fetchone()
+        if done and done[0] and day != today:
+            continue
+        rollup_day(conn, day)
+        conn.execute(
+            "INSERT INTO daily_rollup (day, complete) VALUES (?, ?) "
+            "ON CONFLICT(day) DO UPDATE SET complete = excluded.complete",
+            (day, 0 if day >= today else 1),
+        )
+    conn.commit()
+    cutoff_ts = now - retain_days * 86400
+    for table in (
+        "request_log",
+        "status_log",
+        "success_log",
+        "token_usage_log",
+        "token_rate_usage",
+        "client_usage_log",
+        "client_token_usage_log",
+    ):
+        conn.execute(f"DELETE FROM {table} WHERE ts < ?", (cutoff_ts,))
+    conn.commit()
+
+
+def _clamp_days(days: int) -> int:
+    return max(1, min(3650, days))
+
+
+def _day_bounds(days: int, now: int | None) -> tuple[int, int]:
+    days = _clamp_days(days)
+    now = int(time.time()) if now is None else now
+    today = now - now % 86400
+    start = today - (days - 1) * 86400
+    return start, today
+
+
+def get_daily_usage(
+    conn, days: int = 90, token: str | None = None, now: int | None = None
+) -> list[dict]:
+    start, today = _day_bounds(days, now)
+    req_sql = (
+        "SELECT day, SUM(requests), SUM(successes) FROM daily_requests "
+        "WHERE day >= ? AND day <= ?"
+    )
+    tok_sql = (
+        "SELECT day, SUM(input_tokens), SUM(output_tokens), SUM(cache_read), "
+        "SUM(cache_write) FROM daily_tokens WHERE day >= ? AND day <= ?"
+    )
+    req_params: list = [start, today]
+    tok_params: list = [start, today]
+    if token is not None:
+        req_sql += " AND token = ?"
+        tok_sql += " AND token = ?"
+        req_params.append(token)
+        tok_params.append(token)
+    req_sql += " GROUP BY day"
+    tok_sql += " GROUP BY day"
+
+    merged: dict[int, dict] = {}
+    for day, requests, successes in conn.execute(req_sql, req_params).fetchall():
+        merged[day] = {
+            "day": day,
+            "date": datetime.fromtimestamp(day, tz=timezone.utc).strftime("%Y-%m-%d"),
+            "requests": requests or 0,
+            "successes": successes or 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+        }
+    for day, inp, out, cr, cw in conn.execute(tok_sql, tok_params).fetchall():
+        entry = merged.setdefault(
+            day,
+            {
+                "day": day,
+                "date": datetime.fromtimestamp(day, tz=timezone.utc).strftime(
+                    "%Y-%m-%d"
+                ),
+                "requests": 0,
+                "successes": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read": 0,
+                "cache_write": 0,
+            },
+        )
+        entry["input_tokens"] = inp or 0
+        entry["output_tokens"] = out or 0
+        entry["cache_read"] = cr or 0
+        entry["cache_write"] = cw or 0
+    return [merged[d] for d in sorted(merged)]
+
+
+def get_daily_usage_by_provider(
+    conn, days: int = 90, token: str | None = None, now: int | None = None
+) -> list[dict]:
+    start, today = _day_bounds(days, now)
+    req_sql = (
+        "SELECT day, provider, SUM(requests), SUM(successes) FROM daily_requests "
+        "WHERE day >= ? AND day <= ?"
+    )
+    tok_sql = (
+        "SELECT day, provider, SUM(input_tokens), SUM(output_tokens), "
+        "SUM(cache_read), SUM(cache_write) FROM daily_tokens "
+        "WHERE day >= ? AND day <= ?"
+    )
+    req_params: list = [start, today]
+    tok_params: list = [start, today]
+    if token is not None:
+        req_sql += " AND token = ?"
+        tok_sql += " AND token = ?"
+        req_params.append(token)
+        tok_params.append(token)
+    req_sql += " GROUP BY day, provider"
+    tok_sql += " GROUP BY day, provider"
+
+    merged: dict[tuple[int, str], dict] = {}
+    for day, provider, requests, successes in conn.execute(
+        req_sql, req_params
+    ).fetchall():
+        merged[(day, provider)] = {
+            "day": day,
+            "date": datetime.fromtimestamp(day, tz=timezone.utc).strftime("%Y-%m-%d"),
+            "provider": provider,
+            "requests": requests or 0,
+            "successes": successes or 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+        }
+    for day, provider, inp, out, cr, cw in conn.execute(tok_sql, tok_params).fetchall():
+        entry = merged.setdefault(
+            (day, provider),
+            {
+                "day": day,
+                "date": datetime.fromtimestamp(day, tz=timezone.utc).strftime(
+                    "%Y-%m-%d"
+                ),
+                "provider": provider,
+                "requests": 0,
+                "successes": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read": 0,
+                "cache_write": 0,
+            },
+        )
+        entry["input_tokens"] = inp or 0
+        entry["output_tokens"] = out or 0
+        entry["cache_read"] = cr or 0
+        entry["cache_write"] = cw or 0
+    return [merged[k] for k in sorted(merged)]
+
+
 def init_db(
     usage_db: str,
     pool_file: str = "",
@@ -443,6 +645,36 @@ def init_db(
     )
     _seed_default_pricing(conn)
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS daily_requests ("
+        "  token     TEXT NOT NULL,"
+        "  provider  TEXT NOT NULL,"
+        "  day       INTEGER NOT NULL,"
+        "  requests  INTEGER NOT NULL DEFAULT 0,"
+        "  successes INTEGER NOT NULL DEFAULT 0,"
+        "  PRIMARY KEY (token, provider, day)"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS daily_tokens ("
+        "  token         TEXT NOT NULL,"
+        "  provider      TEXT NOT NULL,"
+        "  model         TEXT NOT NULL DEFAULT '',"
+        "  day           INTEGER NOT NULL,"
+        "  input_tokens  INTEGER NOT NULL DEFAULT 0,"
+        "  output_tokens INTEGER NOT NULL DEFAULT 0,"
+        "  cache_read    INTEGER NOT NULL DEFAULT 0,"
+        "  cache_write   INTEGER NOT NULL DEFAULT 0,"
+        "  PRIMARY KEY (token, provider, model, day)"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS daily_rollup ("
+        "  day      INTEGER PRIMARY KEY,"
+        "  complete INTEGER NOT NULL DEFAULT 0"
+        ")"
+    )
+
     generated_admins: list[str] = []
 
     has_any_admin = conn.execute(
@@ -498,29 +730,18 @@ def init_db(
         conn.commit()
         print(f"[DB] Added {need} tokens to pool, now {pool_count} total")
 
-    conn.execute(
-        "DELETE FROM request_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
+    rollup_and_purge(conn)
+    cutoff_ts = int(time.time()) - 35 * 86400
+    n_daily_rows = conn.execute(
+        "SELECT COUNT(DISTINCT day) FROM daily_rollup"
+    ).fetchone()[0]
+    cutoff_date = datetime.fromtimestamp(cutoff_ts, tz=timezone.utc).strftime(
+        "%Y-%m-%d"
     )
-    conn.execute(
-        "DELETE FROM status_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
+    print(
+        f"[DB] Daily rollup: {n_daily_rows} days retained, "
+        f"detail purged before {cutoff_date}"
     )
-    conn.execute(
-        "DELETE FROM success_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
-    )
-    conn.execute(
-        "DELETE FROM token_usage_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
-    )
-    conn.execute(
-        "DELETE FROM token_rate_usage WHERE ts < ?", (int(time.time()) - 35 * 86400,)
-    )
-    conn.execute(
-        "DELETE FROM client_usage_log WHERE ts < ?", (int(time.time()) - 35 * 86400,)
-    )
-    conn.execute(
-        "DELETE FROM client_token_usage_log WHERE ts < ?",
-        (int(time.time()) - 35 * 86400,),
-    )
-    conn.commit()
 
     total = conn.execute("SELECT COUNT(*) FROM token_pool").fetchone()[0]
     print(f"[DB] {usage_db} initialized, {total} tokens in pool")

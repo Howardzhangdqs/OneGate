@@ -95,6 +95,7 @@ class TestHandlers(AioHTTPTestCase):
             _,
             usage_stream_api,
             usage_sse_handler,
+            _,
         ) = create_handlers(
             self.cfg,
             self.token_pool,
@@ -244,6 +245,7 @@ class TestAdminAPI(AioHTTPTestCase):
             serve_usage_page,
             info_api_handler,
             proxy_handler,
+            _,
             _,
             _,
             _,
@@ -519,7 +521,7 @@ class TestPrivacyProxyE2E(AioHTTPTestCase):
             skip_auto_headers={"User-Agent"},
         )
 
-        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+        (_, _, proxy_handler, _, _, _, _, _, _, _) = create_handlers(
             self.cfg,
             self.token_pool,
             self.db_conn,
@@ -616,7 +618,7 @@ class TestStreamAcceptEncodingProxy(AioHTTPTestCase):
             skip_auto_headers={"User-Agent"},
         )
 
-        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+        (_, _, proxy_handler, _, _, _, _, _, _, _) = create_handlers(
             self.cfg,
             self.token_pool,
             self.db_conn,
@@ -711,7 +713,7 @@ class TestStreamKeepaliveProxy(AioHTTPTestCase):
             skip_auto_headers={"User-Agent"},
         )
 
-        (_, _, proxy_handler, _, _, _, _, _, _) = create_handlers(
+        (_, _, proxy_handler, _, _, _, _, _, _, _) = create_handlers(
             self.cfg,
             self.token_pool,
             self.db_conn,
